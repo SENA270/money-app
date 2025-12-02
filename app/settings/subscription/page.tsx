@@ -42,6 +42,15 @@ export default function SubscriptionSettingsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
 
+  // ★ ログインチェック
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser"); // ログイン時に保存しているキー名に合わせる
+    if (!user) {
+      window.location.href = "/login"; // 実際のログインページに合わせて変更OK
+    }
+  }, []);
+
   // 初期読み込み
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -291,11 +300,12 @@ export default function SubscriptionSettingsPage() {
                             <option key={a.id} value={a.id}>
                               {a.type === "card"
                                 ? `【カード】${a.name}`
-                                : `【${a.type === "bank"
-                                    ? "銀行"
-                                    : a.type === "wallet"
-                                    ? "財布"
-                                    : "QR"
+                                : `【${
+                                    a.type === "bank"
+                                      ? "銀行"
+                                      : a.type === "wallet"
+                                      ? "財布"
+                                      : "QR"
                                   }】${a.name}`}
                             </option>
                           ))}

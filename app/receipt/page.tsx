@@ -7,6 +7,7 @@ import React, {
   ChangeEvent,
   useEffect,
 } from "react";
+import ProtectedPage from "../components/ProtectedPage";
 
 type OcrResult = {
   totalAmount: number | null;
@@ -65,7 +66,7 @@ function sendToParent(payload: PendingReceiptPayload) {
   }
 }
 
-export default function ReceiptPage() {
+function ReceiptInnerPage() {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<OcrResult>(initialResult);
   const [error, setError] = useState<string | null>(null);
@@ -272,5 +273,14 @@ export default function ReceiptPage() {
         </section>
       )}
     </main>
+  );
+}
+
+// ▼ ログインガード付きで公開
+export default function ProtectedReceiptPage() {
+  return (
+    <ProtectedPage>
+      <ReceiptInnerPage />
+    </ProtectedPage>
   );
 }

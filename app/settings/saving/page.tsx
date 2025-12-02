@@ -35,6 +35,15 @@ export default function SavingSettingsPage() {
   const [goals, setGoals] = useState<SavingGoal[]>([]);
   const [message, setMessage] = useState<string>("");
 
+  // ★ ログインチェック（他の設定ページと同じパターン）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser"); // ログイン時に入れてるキー名に合わせる
+    if (!user) {
+      window.location.href = "/login"; // 実際のログインページに合わせて
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = localStorage.getItem("settings");
@@ -134,7 +143,11 @@ export default function SavingSettingsPage() {
                     onChange={(e) =>
                       handleChange(goal.id, "name", e.target.value)
                     }
-                    style={{ marginLeft: 4, padding: "2px 6px", width: "200px" }}
+                    style={{
+                      marginLeft: 4,
+                      padding: "2px 6px",
+                      width: "200px",
+                    }}
                   />
                 </label>
               </div>
@@ -152,7 +165,11 @@ export default function SavingSettingsPage() {
                         Number(e.target.value || 0)
                       )
                     }
-                    style={{ marginLeft: 4, padding: "2px 6px", width: "160px" }}
+                    style={{
+                      marginLeft: 4,
+                      padding: "2px 6px",
+                      width: "160px",
+                    }}
                   />
                   <span style={{ marginLeft: 4 }}>円</span>
                 </label>
@@ -232,7 +249,9 @@ export default function SavingSettingsPage() {
       </button>
 
       {message && (
-        <p style={{ marginTop: 8, color: "#5d4333", fontSize: 14 }}>{message}</p>
+        <p style={{ marginTop: 8, color: "#5d4333", fontSize: 14 }}>
+          {message}
+        </p>
       )}
 
       <div style={{ marginTop: 24 }}>

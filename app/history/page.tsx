@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -38,7 +39,7 @@ function formatDate(dateStr: string) {
   return `${y}-${m}-${day}`;
 }
 
-export default function HistoryPage() {
+function HistoryContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
 
@@ -195,11 +196,19 @@ export default function HistoryPage() {
                 <tr>
                   <th style={{ textAlign: "left", padding: "4px 6px" }}>日付</th>
                   <th style={{ textAlign: "left", padding: "4px 6px" }}>種類</th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>カテゴリ</th>
-                  <th style={{ textAlign: "right", padding: "4px 6px" }}>金額</th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>支払い方法</th>
+                  <th style={{ textAlign: "left", padding: "4px 6px" }}>
+                    カテゴリ
+                  </th>
+                  <th style={{ textAlign: "right", padding: "4px 6px" }}>
+                    金額
+                  </th>
+                  <th style={{ textAlign: "left", padding: "4px 6px" }}>
+                    支払い方法
+                  </th>
                   <th style={{ textAlign: "left", padding: "4px 6px" }}>メモ</th>
-                  <th style={{ textAlign: "center", padding: "4px 6px" }}>操作</th>
+                  <th style={{ textAlign: "center", padding: "4px 6px" }}>
+                    操作
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -277,5 +286,14 @@ export default function HistoryPage() {
         <Link href="/">← ホームに戻る</Link>
       </div>
     </div>
+  );
+}
+
+// ProtectedPage でガード
+export default function HistoryPage() {
+  return (
+    <ProtectedPage>
+      <HistoryContent />
+    </ProtectedPage>
   );
 }

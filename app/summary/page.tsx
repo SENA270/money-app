@@ -1,6 +1,7 @@
 // app/summary/page.tsx
 "use client";
 
+import { useEffect } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -20,6 +21,15 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function SummaryPage() {
+  // ★ ログインチェック（これまでと同じ方式）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser");
+    if (!user) {
+      window.location.href = "/login";
+    }
+  }, []);
+
   const {
     categoryTotals,
     cardSpendThisMonth,

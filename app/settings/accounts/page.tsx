@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -10,8 +11,9 @@ type Account = {
   type: AccountType;
   name: string;
   // カード専用
-  closingDay?: number;  // 締め日
-  paymentDay?: number;  // 支払日（翌月）
+  closingDay?: number; // 締め日
+  paymentDay?: number; // 支払日（翌月）
+  paymentKey?: string; // 内訳キー（明細の payment と紐付ける用）
 };
 
 function createEmptyAccount(type: AccountType): Account {
@@ -22,7 +24,7 @@ function createEmptyAccount(type: AccountType): Account {
   };
 }
 
-export default function AccountSettingsPage() {
+function AccountSettingsInnerPage() {
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
   const [walletAccounts, setWalletAccounts] = useState<Account[]>([]);
   const [qrAccounts, setQrAccounts] = useState<Account[]>([]);
@@ -102,7 +104,20 @@ export default function AccountSettingsPage() {
 
       setCardAccounts((prev) =>
         prev.map((a) =>
-          a.id === id ? { ...a, [field]: num && !Number.isNaN(num) ? num : undefined } : a
+          a.id === id
+            ? { ...a, [field]: num && !Number.isNaN(num) ? num : undefined }
+            : a
+        )
+      );
+    };
+
+  // カード専用：内訳キー
+  const handleCardPaymentKeyChange =
+    (id: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setCardAccounts((prev) =>
+        prev.map((a) =>
+          a.id === id ? { ...a, paymentKey: value } : a
         )
       );
     };
@@ -162,7 +177,11 @@ export default function AccountSettingsPage() {
     }
   };
 
-  const renderSimpleTable = (type: AccountType, rows: Account[], title: string) => (
+  const renderSimpleTable = (
+    type: AccountType,
+    rows: Account[],
+    title: string
+  ) => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>{title}</h2>
       <table
@@ -247,6 +266,9 @@ export default function AccountSettingsPage() {
         <thead>
           <tr>
             <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
+            <th style={{ textAlign: "left", padding: "4px 6px" }}>
+              内訳キー（任意）
+            </th>
             <th style={{ textAlign: "right", padding: "4px 6px" }}>締め日</th>
             <th style={{ textAlign: "right", padding: "4px 6px" }}>
               支払日（翌月）
@@ -267,6 +289,21 @@ export default function AccountSettingsPage() {
                     padding: "4px 6px",
                     borderRadius: 4,
                     border: "1px solid #ccb89b",
+                  }}
+                />
+              </td>
+              <td style={{ padding: "4px 6px" }}>
+                <input
+                  type="text"
+                  value={a.paymentKey ?? ""}
+                  onChange={handleCardPaymentKeyChange(a.id)}
+                  placeholder="例：セゾンカード家計用"
+                  style={{
+                    width: "100%",
+                    padding: "4px 6px",
+                    borderRadius: 4,
+                    border: "1px solid #ccb89b",
+                    fontSize: 12,
                   }}
                 />
               </td>
@@ -378,5 +415,13 @@ export default function AccountSettingsPage() {
         <a href="/">◀ ホームに戻る</a>
       </div>
     </div>
+  );
+}
+
+export default function ProtectedAccountSettingsPage() {
+  return (
+    <ProtectedPage>
+      <AccountSettingsInnerPage />
+    </ProtectedPage>
   );
 }

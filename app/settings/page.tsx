@@ -1,9 +1,19 @@
 // app/settings/page.tsx
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 
 export default function SettingsTopPage() {
+  // ★ ログインチェック（他ページと同じ方式）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser");
+    if (!user) {
+      window.location.href = "/login";
+    }
+  }, []);
+
   return (
     <div className="page-container">
       <h1>設定</h1>
@@ -15,13 +25,12 @@ export default function SettingsTopPage() {
         <Link href="/settings/income">▶ 収入・給料の設定へ</Link>
       </div>
 
-      {/* ★ ここから追加：カテゴリ設定 */}
+      {/* ★ カテゴリ設定 */}
       <div className="app-card">
         <h2>カテゴリ設定</h2>
         <p>支出・収入で使うカテゴリを登録します。入力画面などで選択できる一覧になります。</p>
         <Link href="/settings/categories">▶ カテゴリの設定へ</Link>
       </div>
-      {/* ★ 追加ここまで */}
 
       <div className="app-card">
         <h2>貯金目標設定</h2>

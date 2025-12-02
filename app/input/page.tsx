@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -44,7 +45,7 @@ type PendingReceiptPayload = {
   memo?: string;
 };
 
-export default function InputPage() {
+function InputInnerPage() {
   // フォームの状態
   const [date, setDate] = useState<string>(() => {
     const d = new Date();
@@ -249,7 +250,6 @@ export default function InputPage() {
 
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-    // accounts / categories / options が変わっても最新を使えるよう依存に含めない
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -621,5 +621,14 @@ export default function InputPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ▼ ログインガード付きで公開
+export default function ProtectedInputPage() {
+  return (
+    <ProtectedPage>
+      <InputInnerPage />
+    </ProtectedPage>
   );
 }

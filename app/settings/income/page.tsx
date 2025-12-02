@@ -22,6 +22,15 @@ type IncomeSettings = {
 };
 
 export default function IncomeSettingsPage() {
+  // ★ ログインチェック（今までと同じスタイル）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser"); // 実際のキー名に合わせて
+    if (!user) {
+      window.location.href = "/login"; // 実際のログインページに合わせて
+    }
+  }, []);
+
   const [monthlyIncome, setMonthlyIncome] = useState<string>("");
   const [payday, setPayday] = useState<string>("25");
   const [startDate, setStartDate] = useState<string>("");

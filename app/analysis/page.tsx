@@ -12,8 +12,16 @@ import {
   BarElement,
 } from "chart.js";
 import { Doughnut, Bar } from "react-chartjs-2";
+import ProtectedPage from "../components/ProtectedPage"; // ← 追加
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement
+);
 
 type TransactionType = "expense" | "income";
 
@@ -67,7 +75,8 @@ function calcBillingDate(
   return new Date(year, billingMonthIndex, paymentDay);
 }
 
-export default function AnalysisPage() {
+// =============== ここから中身コンポーネント ===============
+function AnalysisContent() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
@@ -384,5 +393,14 @@ export default function AnalysisPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// =============== 最終 export ===============
+export default function AnalysisPage() {
+  return (
+    <ProtectedPage>
+      <AnalysisContent />
+    </ProtectedPage>
   );
 }

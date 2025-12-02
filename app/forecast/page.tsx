@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../components/ProtectedPage";
 
 // ---------- 型定義 ----------
 
@@ -129,8 +130,9 @@ function inRange(d: Date, from: Date, to: Date): boolean {
 }
 
 // --------------------------------------------------
-
-export default function ForecastPage() {
+// 中身コンポーネント
+// --------------------------------------------------
+function ForecastContent() {
   // シミュレーション
   const [rows, setRows] = useState<SimRow[]>([]);
   const [startBalance, setStartBalance] = useState(0);
@@ -156,7 +158,6 @@ export default function ForecastPage() {
 
   // ─────────────────────
   // 2) 6ヶ月資金繰りシミュレーション
-  //    （元の /forecast ロジックそのまま）
   // ─────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -380,7 +381,7 @@ export default function ForecastPage() {
   }, []);
 
   // ─────────────────────
-  // 3) 今月〜来月の請求一覧（旧 /bills のロジック）
+  // 3) 今月〜来月の請求一覧
   // ─────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -735,5 +736,16 @@ export default function ForecastPage() {
 
       <div style={{ marginTop: "12px" }}>← ホームに戻る</div>
     </main>
+  );
+}
+
+// --------------------------------------------------
+// export: ProtectedPage でガード
+// --------------------------------------------------
+export default function ForecastPage() {
+  return (
+    <ProtectedPage>
+      <ForecastContent />
+    </ProtectedPage>
   );
 }

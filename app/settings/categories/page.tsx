@@ -54,6 +54,15 @@ function createDefaultCategories(): Category[] {
 }
 
 export default function CategoryAndBudgetSettingsPage() {
+  // ★ ログインしていなければ /login に飛ばす（今までと同じスタイル）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser"); // ここは使ってるキー名に合わせて
+    if (!user) {
+      window.location.href = "/login"; // ログインページのパスに合わせて
+    }
+  }, []);
+
   // カテゴリ
   const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
@@ -168,7 +177,9 @@ export default function CategoryAndBudgetSettingsPage() {
 
   // カテゴリ削除
   const deleteCategory = (type: CategoryType, id: string) => {
-    if (!window.confirm("このカテゴリを削除しますか？\n関連する予算設定も消えます。")) {
+    if (
+      !window.confirm("このカテゴリを削除しますか？\n関連する予算設定も消えます。")
+    ) {
       return;
     }
 

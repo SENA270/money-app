@@ -2,8 +2,16 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+  const pathname = usePathname();
+
+  // ★ ログイン画面ではフッターを出さない
+  if (pathname === "/login") {
+    return null;
+  }
+
   return (
     <footer
       style={{

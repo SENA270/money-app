@@ -30,6 +30,15 @@ export default function LoanSettingsPage() {
   const [items, setItems] = useState<LoanItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // ★ ログインチェック（他ページと同じパターン）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const user = window.localStorage.getItem("authUser"); // 実際のキー名に合わせて
+    if (!user) {
+      window.location.href = "/login"; // 実際のログインページに合わせて
+    }
+  }, []);
+
   // 初期読み込み
   useEffect(() => {
     if (typeof window === "undefined") return;

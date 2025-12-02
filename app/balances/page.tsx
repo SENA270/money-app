@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -66,10 +67,6 @@ function getLastDayOfMonth(year: number, monthIndex0: number): number {
 /**
  * 収入設定に基づいて「今日までに発生しているはずの給与」を
  * transactions に自動追加する。
- *
- * - 初回実行時：startDate 〜 今日 までをチェック
- * - 2回目以降：前回実行日＋1日 〜 今日 までをチェック
- * - 既に同じ日付に「自動登録：給与」がある場合は追加しない
  */
 function applyScheduledIncome(today: Date) {
   if (typeof window === "undefined") return;
@@ -99,9 +96,10 @@ function applyScheduledIncome(today: Date) {
     }
   }
 
-  const depositAccount =
-    incomeSettings.depositAccountId &&
-    accounts.find((a) => a.id === incomeSettings.depositAccountId);
+  const depositAccount: Account | undefined =
+    incomeSettings.depositAccountId
+      ? accounts.find((a) => a.id === incomeSettings.depositAccountId) ?? undefined
+      : undefined;
 
   const depositPaymentName = depositAccount?.name || "給与振込口座";
 
@@ -188,11 +186,6 @@ function applyScheduledIncome(today: Date) {
 /**
  * サブスク設定に基づいて「今日までに発生しているはずのサブスク」を
  * transactions に自動追加する。
- *
- * - 1日単位で日付を進めて billingDay をチェック
- * - 既に同じ日付＋同じサブスク名の「自動登録：サブスク」があれば追加しない
- * - 支払い元が口座の場合：その口座名を payment に入れる → 残高に反映される
- * - 支払い元がカードの場合：カード名を payment に入れる → balances ではカードは無視されるので現金残高は減らない
  */
 function applyScheduledSubscriptions(today: Date) {
   if (typeof window === "undefined") return;
@@ -306,7 +299,8 @@ function applyScheduledSubscriptions(today: Date) {
   localStorage.setItem("autoSubLastApplied", todayStr);
 }
 
-export default function BalancesPage() {
+// ================== 中身用コンポーネント ==================
+function BalancesContent() {
   const [bankRows, setBankRows] = useState<
     { id: string; name: string; balance: number }[]
   >([]);
@@ -535,5 +529,14 @@ export default function BalancesPage() {
         <a href="/">◀ ホームに戻る</a>
       </div>
     </div>
+  );
+}
+
+// ================== export ==================
+export default function BalancesPage() {
+  return (
+    <ProtectedPage>
+      <BalancesContent />
+    </ProtectedPage>
   );
 }

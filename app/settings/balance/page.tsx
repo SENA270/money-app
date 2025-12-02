@@ -3,12 +3,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type BalanceItem = {
   id: string;
-  name: string;      // 口座名・カード名・財布など
-  kind: string;      // 種別（現金 / 口座 / カード など）
-  amount: number;    // 現在の残高
+  name: string; // 口座名・カード名・財布など
+  kind: string; // 種別（現金 / 口座 / カード など）
+  amount: number; // 現在の残高
   memo: string;
 };
 
@@ -20,7 +21,7 @@ function createId() {
   return Math.random().toString(36).slice(2);
 }
 
-export default function BalanceSettingsPage() {
+function BalanceSettingsInnerPage() {
   const [items, setItems] = useState<BalanceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -37,7 +38,11 @@ export default function BalanceSettingsPage() {
     }
   }, []);
 
-  const handleChange = (id: string, field: keyof BalanceItem, value: string) => {
+  const handleChange = (
+    id: string,
+    field: keyof BalanceItem,
+    value: string
+  ) => {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -64,7 +69,7 @@ export default function BalanceSettingsPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm("この残高情報を削除しますか？")) return;
+    if (!window.confirm("この残高情報を削除しますか？")) return;
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
@@ -96,7 +101,8 @@ export default function BalanceSettingsPage() {
       <h1>残高設定（現金・口座・カードなど）</h1>
       <p style={{ marginBottom: 16 }}>
         現金や口座、カードの残高などを登録します。
-        将来的に「資産の合計」「負債の合計」を見える化する土台になります。
+        <br />
+        将来的に「資産の合計」「負債の合計」を見える化するための土台になります。
       </p>
 
       <div className="app-card">
@@ -138,14 +144,24 @@ export default function BalanceSettingsPage() {
               type="text"
               value={item.name}
               onChange={(e) => handleChange(item.id, "name", e.target.value)}
-              style={{ width: "100%" }}
+              style={{
+                width: "100%",
+                padding: "4px 6px",
+                borderRadius: 4,
+                border: "1px solid #ccb89b",
+              }}
             />
             <input
               type="text"
               value={item.kind}
               onChange={(e) => handleChange(item.id, "kind", e.target.value)}
               placeholder="現金 / 口座 / カード など"
-              style={{ width: "100%" }}
+              style={{
+                width: "100%",
+                padding: "4px 6px",
+                borderRadius: 4,
+                border: "1px solid #ccb89b",
+              }}
             />
             <input
               type="number"
@@ -153,18 +169,37 @@ export default function BalanceSettingsPage() {
               onChange={(e) =>
                 handleChange(item.id, "amount", e.target.value)
               }
-              style={{ width: "100%", textAlign: "right" }}
+              style={{
+                width: "100%",
+                padding: "4px 6px",
+                borderRadius: 4,
+                border: "1px solid #ccb89b",
+                textAlign: "right",
+              }}
             />
             <input
               type="text"
               value={item.memo}
               onChange={(e) => handleChange(item.id, "memo", e.target.value)}
-              style={{ width: "100%" }}
+              style={{
+                width: "100%",
+                padding: "4px 6px",
+                borderRadius: 4,
+                border: "1px solid #ccb89b",
+              }}
             />
             <button
               type="button"
               onClick={() => handleDelete(item.id)}
-              style={{ fontSize: 12 }}
+              style={{
+                fontSize: 12,
+                padding: "2px 8px",
+                borderRadius: 999,
+                border: "1px solid #c44536",
+                backgroundColor: "#fff5f3",
+                color: "#c44536",
+                cursor: "pointer",
+              }}
             >
               削除
             </button>
@@ -178,10 +213,34 @@ export default function BalanceSettingsPage() {
         </div>
 
         <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-          <button type="button" onClick={handleAdd}>
+          <button
+            type="button"
+            onClick={handleAdd}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid #b58b5a",
+              backgroundColor: "#fef6e9",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
             ＋ 行を追加
           </button>
-          <button type="button" onClick={handleSave} disabled={isSaving}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "none",
+              backgroundColor: "#b58b5a",
+              color: "#fff",
+              cursor: isSaving ? "not-allowed" : "pointer",
+              fontSize: 13,
+            }}
+          >
             {isSaving ? "保存中..." : "保存する"}
           </button>
         </div>
@@ -191,5 +250,13 @@ export default function BalanceSettingsPage() {
         <Link href="/settings">← 設定トップへ戻る</Link>
       </div>
     </div>
+  );
+}
+
+export default function ProtectedBalanceSettingsPage() {
+  return (
+    <ProtectedPage>
+      <BalanceSettingsInnerPage />
+    </ProtectedPage>
   );
 }
