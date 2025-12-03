@@ -15,42 +15,70 @@ export function AuthGuard({ children }: Props) {
   const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const checkSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("getSession error", error);
+        // 1. まずセッションを確認
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        console.log("AuthGuard getSession result", {
+          data: sessionData,
+          error: sessionError,
+        });
+
+        if (sessionError) {
+          console.error("getSession error", sessionError);
         }
 
-        if (!data?.session) {
-          // 未ログインなら /login へ飛ばす
-          router.replace("/login");
+        let authed = !!sessionData?.session;
+
+        // 2. セッションが取れなかったら getUser でもう一度確認
+        if (!authed) {
+          const { data: userData, error: userError } =
+            await supabase.auth.getUser();
+          console.log("AuthGuard getUser result", {
+            data: userData,
+            error: userError,
+          });
+
+          if (userError) {
+            console.error("getUser error", userError);
+          }
+
+          authed = !!userData?.user;
+        }
+
+        if (cancelled) return;
+
+        if (!authed) {
           setIsAuthed(false);
+          router.replace("/login");
         } else {
           setIsAuthed(true);
         }
       } catch (e) {
-        console.error(e);
-        router.replace("/login");
-        setIsAuthed(false);
+        console.error("AuthGuard checkSession error", e);
+        if (!cancelled) {
+          setIsAuthed(false);
+          router.replace("/login");
+        }
       } finally {
-        setChecking(false);
+        if (!cancelled) {
+          setChecking(false);
+        }
       }
     };
 
     checkSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  if (checking) {
-    // チェック中は何も表示しない（チラつき防止）
-    return null;
-  }
+  if (checking) return null;
+  if (!isAuthed) return null;
 
-  if (!isAuthed) {
-    // 未ログインの場合、/login へのリダイレクトを待つだけ
-    return null;
-  }
-
-  // ログイン済みなら中身を表示
   return <>{children}</>;
 }

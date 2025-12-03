@@ -237,10 +237,316 @@ export default function Home() {
       : null;
 
   return (
-    {/* ここにセナの元の Home の JSX（まるごと） */}
     <div className="page-container">
       <h1>ホーム</h1>
-      {/* 以下、全部あなたの元コード通り */}
+      <p style={{ marginBottom: "12px" }}>
+        月ごとの予算と実績をざっくり確認できるページです。
+      </p>
+
+      {/* 月送り */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 16,
+          fontSize: 14,
+        }}
+      >
+        <button
+          type="button"
+          onClick={handlePrevMonth}
+          style={{
+            padding: "4px 10px",
+            borderRadius: 999,
+            border: "1px solid #c1a97e",
+            background: "#fef9ed",
+            cursor: "pointer",
+          }}
+        >
+          ← 前の月
+        </button>
+        <span>表示中: {displayMonthLabel}</span>
+        <button
+          type="button"
+          onClick={handleNextMonth}
+          style={{
+            padding: "4px 10px",
+            borderRadius: 999,
+            border: "1px solid #c1a97e",
+            background: "#fef9ed",
+            cursor: "pointer",
+          }}
+        >
+          次の月 →
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+          alignItems: "flex-start",
+        }}
+      >
+        {/* 左：サマリー */}
+        <div
+          className="app-card"
+          style={{ flex: "2 1 320px", minWidth: "280px" }}
+        >
+          <h2>{displayMonthLabel}のサマリー</h2>
+
+          {hasBudget ? (
+            <>
+              {/* 今月の残りを少し強調 */}
+              <div
+                style={{
+                  marginTop: 4,
+                  marginBottom: 8,
+                  fontSize: 14,
+                }}
+              >
+                今月使える残り：
+                <strong
+                  style={{
+                    fontSize: 18,
+                    color: isOverAll ? "#c44536" : "#3b2a1a",
+                    marginLeft: 4,
+                  }}
+                >
+                  ¥{Math.abs(rawRemainingTotal).toLocaleString()}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  position: "relative",
+                  maxWidth: "360px",
+                  margin: "0 auto",
+                }}
+              >
+                <Doughnut data={doughnutData} options={doughnutOptions} />
+
+                {/* 真ん中の表示 */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    textAlign: "center",
+                    pointerEvents: "none",
+                    color: "#3b2a1a",
+                  }}
+                >
+                  <div style={{ fontSize: "13px", marginBottom: 2 }}>
+                    {isOverAll ? "オーバー" : "残り"}
+                  </div>
+                  <div style={{ fontSize: "18px", fontWeight: 700 }}>
+                    ¥{Math.abs(rawRemainingTotal).toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: "11px", marginTop: 2 }}>
+                    / 予算 ¥{monthlyBudgetTotal.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "12px", fontSize: "14px" }}>
+                <p>
+                  予算：
+                  <strong>¥{monthlyBudgetTotal.toLocaleString()}</strong>
+                </p>
+                <p>
+                  使った金額：
+                  <strong>¥{monthlyExpense.toLocaleString()}</strong>
+                </p>
+                {remainingDays !== null ? (
+                  <>
+                    <p>
+                      残り日数：<strong>{remainingDays}</strong>日
+                    </p>
+                    <p>
+                      1日あたり使える金額：
+                      <strong>
+                        ¥{(perDayBudget ?? 0).toLocaleString()}
+                      </strong>
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ color: "#555", marginTop: 4 }}>
+                    ※ 今月以外を表示中のため、残り日数と1日あたりの目安は表示していません。
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <p style={{ marginTop: "8px" }}>
+              この月の予算がまだ設定されていません。
+              <br />
+              「設定 &gt; カテゴリ別予算」から予算を登録してください。
+            </p>
+          )}
+        </div>
+
+        {/* 右：カテゴリ別 */}
+        <div
+          className="app-card"
+          style={{ flex: "1 1 260px", minWidth: "260px" }}
+        >
+          <h2>カテゴリ別 残り予算</h2>
+
+          {!hasBudget ? (
+            <p>カテゴリ別の予算がまだ登録されていません。</p>
+          ) : categoryRows.length === 0 ? (
+            <p>この月のカテゴリ別予算は設定されていますが、明細がありません。</p>
+          ) : (
+            <>
+              {/* 全体状況の説明 */}
+              {isOverAll ? (
+                <div
+                  style={{
+                    fontSize: "13px",
+                    marginBottom: 8,
+                    color: "#c44536",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  全体で
+                  <strong>
+                    ¥{totalDeficit.toLocaleString()}
+                  </strong>
+                  オーバーしています。
+                  <br />
+                  他カテゴリの残り合計は
+                  <strong>
+                    ¥{totalRemainingPositive.toLocaleString()}
+                  </strong>
+                  です。
+                  {stillShort > 0 ? (
+                    <>
+                      <br />
+                      すべて調整しても
+                      <strong>
+                        ¥{stillShort.toLocaleString()}
+                      </strong>
+                      足りない見込みです。
+                    </>
+                  ) : (
+                    <>
+                      <br />
+                      他カテゴリを調整すれば、まだ挽回できる余地があります。
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    fontSize: "13px",
+                    marginBottom: 8,
+                    color: "#555",
+                  }}
+                >
+                  全体としてはまだ予算内です。
+                </div>
+              )}
+
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                {categoryRows.map((row) => {
+                  const isRowOver = row.remaining < 0;
+                  const fillWidth = isRowOver
+                    ? "100%"
+                    : `${row.ratio * 100}%`;
+
+                  const barColor = isRowOver
+                    ? "#c44536"
+                    : isOverAll && row.remaining > 0
+                    ? "#e09f3e"
+                    : "#4f8f3a";
+
+                  // メッセージ：オーバー時だけ表示
+                  let message = "";
+                  if (isRowOver) {
+                    message = "予算オーバーです。他のカテゴリで調整しましょう。";
+                  }
+
+                  return (
+                    <div key={row.name}>
+                      {/* 1行目：カテゴリ名 + 金額 */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "13px",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span>{row.name}</span>
+                        <span
+                          style={{
+                            color: isRowOver ? "#c44536" : "#3b2a1a",
+                          }}
+                        >
+                          {isRowOver ? (
+                            <>
+                              予算オーバー：
+                              ¥{Math.abs(row.remaining).toLocaleString()} / 予算：
+                              ¥{row.budget.toLocaleString()}
+                            </>
+                          ) : (
+                            <>
+                              残り：
+                              ¥{row.remaining.toLocaleString()} / 予算：
+                              ¥{row.budget.toLocaleString()}
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* 2行目：オーバー時だけ注意文 */}
+                      {message && (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            marginBottom: 4,
+                            color: "#c44536",
+                          }}
+                        >
+                          {message}
+                        </div>
+                      )}
+
+                      {/* 棒グラフ */}
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "8px",
+                          borderRadius: "999px",
+                          backgroundColor: "#e6ddcf",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: fillWidth,
+                            height: "100%",
+                            borderRadius: "999px",
+                            backgroundColor: barColor,
+                            transition: "width 0.3s",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      {/* フッターのリンク（明細・シミュレーション） は削除 */}
     </div>
   );
 }
