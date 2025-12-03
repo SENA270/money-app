@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type SavingGoal = {
   id: string;
@@ -103,8 +102,7 @@ export default function SavingSettingsPage() {
   };
 
   return (
-    <ProtectedPage>
-      <div className="page-container">
+    <div className="page-container">
       <h1>貯金目標の設定</h1>
       <p>
         「いつまでに、いくら貯めたいか」を登録します。
@@ -250,7 +248,6 @@ export default function SavingSettingsPage() {
       <div style={{ marginTop: 24 }}>
         <Link href="/settings">◀ 設定トップに戻る</Link>
       </div>
-      </div>
-    </ProtectedPage>
+    </div>
   );
 }

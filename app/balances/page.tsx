@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -534,9 +533,5 @@ function BalancesContent() {
 
 // ================== export ==================
 export default function BalancesPage() {
-  return (
-    <ProtectedPage>
-      <BalancesContent />
-    </ProtectedPage>
-  );
+  return <BalancesContent />;
 }

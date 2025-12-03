@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type BalanceItem = {
   id: string;
@@ -253,10 +252,6 @@ function BalanceSettingsInnerPage() {
   );
 }
 
-export default function ProtectedBalanceSettingsPage() {
-  return (
-    <ProtectedPage>
-      <BalanceSettingsInnerPage />
-    </ProtectedPage>
-  );
+export default function BalanceSettingsPage() {
+  return <BalanceSettingsInnerPage />;
 }

@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -289,11 +288,6 @@ function HistoryContent() {
   );
 }
 
-// ProtectedPage でガード
 export default function HistoryPage() {
-  return (
-    <ProtectedPage>
-      <HistoryContent />
-    </ProtectedPage>
-  );
+  return <HistoryContent />;
 }

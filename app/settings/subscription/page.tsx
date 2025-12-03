@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -157,8 +156,7 @@ export default function SubscriptionSettingsPage() {
   };
 
   return (
-    <ProtectedPage>
-      <div className="page-container">
+    <div className="page-container">
       <h1>サブスク設定</h1>
       <p style={{ marginBottom: 16, fontSize: 14 }}>
         毎月発生するサブスク（固定費）を登録します。
@@ -367,7 +365,6 @@ export default function SubscriptionSettingsPage() {
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <a href="/">◀ ホームに戻る</a>
       </div>
-      </div>
-    </ProtectedPage>
+    </div>
   );
 }

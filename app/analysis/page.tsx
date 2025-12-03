@@ -12,7 +12,6 @@ import {
   BarElement,
 } from "chart.js";
 import { Doughnut, Bar } from "react-chartjs-2";
-import ProtectedPage from "../components/ProtectedPage"; // ← 追加
 
 ChartJS.register(
   ArcElement,
@@ -398,9 +397,5 @@ function AnalysisContent() {
 
 // =============== 最終 export ===============
 export default function AnalysisPage() {
-  return (
-    <ProtectedPage>
-      <AnalysisContent />
-    </ProtectedPage>
-  );
+  return <AnalysisContent />;
 }

@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -112,8 +111,7 @@ export default function IncomeSettingsPage() {
   };
 
   return (
-    <ProtectedPage>
-      <div className="page-container">
+    <div className="page-container">
       <h1>収入の設定</h1>
       <p style={{ marginBottom: 16 }}>
         毎月の給料額・給料日・振込先口座を登録します。
@@ -229,7 +227,6 @@ export default function IncomeSettingsPage() {
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <a href="/">◀ ホームに戻る</a>
       </div>
-      </div>
-    </ProtectedPage>
+    </div>
   );
 }

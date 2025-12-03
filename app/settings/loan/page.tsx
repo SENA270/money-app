@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type Frequency = "monthly" | "half-year" | "yearly";
 
@@ -154,8 +153,7 @@ export default function LoanSettingsPage() {
   );
 
   return (
-    <ProtectedPage>
-      <div className="page-container">
+    <div className="page-container">
       <h1>返済設定（奨学金・分割など）</h1>
       <p style={{ marginBottom: 16 }}>
         奨学金や分割払いについて、
@@ -321,7 +319,6 @@ export default function LoanSettingsPage() {
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <Link href="/settings">← 設定トップへ戻る</Link>
       </div>
-      </div>
-    </ProtectedPage>
+    </div>
   );
 }

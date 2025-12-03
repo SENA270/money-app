@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -419,9 +418,5 @@ function AccountSettingsInnerPage() {
 }
 
 export default function ProtectedAccountSettingsPage() {
-  return (
-    <ProtectedPage>
-      <AccountSettingsInnerPage />
-    </ProtectedPage>
-  );
+  return <AccountSettingsInnerPage />;
 }

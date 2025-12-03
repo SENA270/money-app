@@ -1,6 +1,5 @@
 "use client";
 
-import ProtectedPage from "./components/ProtectedPage"; 
 import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
@@ -238,12 +237,10 @@ export default function Home() {
       : null;
 
   return (
-    <ProtectedPage>
-      {/* ここにセナの元の Home の JSX（まるごと） */}
-      <div className="page-container">
-        <h1>ホーム</h1>
-        {/* 以下、全部あなたの元コード通り */}
-      </div>
-    </ProtectedPage>
+    {/* ここにセナの元の Home の JSX（まるごと） */}
+    <div className="page-container">
+      <h1>ホーム</h1>
+      {/* 以下、全部あなたの元コード通り */}
+    </div>
   );
 }

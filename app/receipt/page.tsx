@@ -7,7 +7,6 @@ import React, {
   ChangeEvent,
   useEffect,
 } from "react";
-import ProtectedPage from "../components/ProtectedPage";
 
 type OcrResult = {
   totalAmount: number | null;
@@ -278,9 +277,5 @@ function ReceiptInnerPage() {
 
 // ▼ ログインガード付きで公開
 export default function ProtectedReceiptPage() {
-  return (
-    <ProtectedPage>
-      <ReceiptInnerPage />
-    </ProtectedPage>
-  );
+  return <ReceiptInnerPage />;
 }

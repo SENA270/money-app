@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProtectedPage from "../components/ProtectedPage";
 
 // ---------- 型定義 ----------
 
@@ -739,13 +738,6 @@ function ForecastContent() {
   );
 }
 
-// --------------------------------------------------
-// export: ProtectedPage でガード
-// --------------------------------------------------
 export default function ForecastPage() {
-  return (
-    <ProtectedPage>
-      <ForecastContent />
-    </ProtectedPage>
-  );
+  return <ForecastContent />;
 }

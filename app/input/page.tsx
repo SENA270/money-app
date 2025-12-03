@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import ProtectedPage from "../components/ProtectedPage";
 
 type TransactionType = "expense" | "income";
 
@@ -626,9 +625,5 @@ function InputInnerPage() {
 
 // ▼ ログインガード付きで公開
 export default function ProtectedInputPage() {
-  return (
-    <ProtectedPage>
-      <InputInnerPage />
-    </ProtectedPage>
-  );
+  return <InputInnerPage />;
 }
