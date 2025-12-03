@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -22,15 +23,6 @@ type IncomeSettings = {
 };
 
 export default function IncomeSettingsPage() {
-  // ★ ログインチェック（今までと同じスタイル）
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const user = window.localStorage.getItem("authUser"); // 実際のキー名に合わせて
-    if (!user) {
-      window.location.href = "/login"; // 実際のログインページに合わせて
-    }
-  }, []);
-
   const [monthlyIncome, setMonthlyIncome] = useState<string>("");
   const [payday, setPayday] = useState<string>("25");
   const [startDate, setStartDate] = useState<string>("");
@@ -120,7 +112,8 @@ export default function IncomeSettingsPage() {
   };
 
   return (
-    <div className="page-container">
+    <ProtectedPage>
+      <div className="page-container">
       <h1>収入の設定</h1>
       <p style={{ marginBottom: 16 }}>
         毎月の給料額・給料日・振込先口座を登録します。
@@ -236,6 +229,7 @@ export default function IncomeSettingsPage() {
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <a href="/">◀ ホームに戻る</a>
       </div>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

@@ -2,20 +2,30 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { AuthGuard } from "./AuthGuard";
 import Header from "./Header";
 import Footer from "./Footer";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // ログインページではヘッダー・フッターを非表示にする
-  const hideLayout = pathname === "/login";
+  const isLoginPage = pathname === "/login";
 
   return (
     <body className="app-root">
-      {!hideLayout && <Header />}
-      <main className="app-main">{children}</main>
-      {!hideLayout && <Footer />}
+      {isLoginPage ? (
+        <>
+          <Header />
+          <main className="app-main">{children}</main>
+          <Footer />
+        </>
+      ) : (
+        <AuthGuard>
+          <Header />
+          <main className="app-main">{children}</main>
+          <Footer />
+        </AuthGuard>
+      )}
     </body>
   );
 }

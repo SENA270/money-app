@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -41,15 +42,6 @@ function createEmptySubscription(): Subscription {
 export default function SubscriptionSettingsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-
-  // ★ ログインチェック
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const user = window.localStorage.getItem("authUser"); // ログイン時に保存しているキー名に合わせる
-    if (!user) {
-      window.location.href = "/login"; // 実際のログインページに合わせて変更OK
-    }
-  }, []);
 
   // 初期読み込み
   useEffect(() => {
@@ -165,7 +157,8 @@ export default function SubscriptionSettingsPage() {
   };
 
   return (
-    <div className="page-container">
+    <ProtectedPage>
+      <div className="page-container">
       <h1>サブスク設定</h1>
       <p style={{ marginBottom: 16, fontSize: 14 }}>
         毎月発生するサブスク（固定費）を登録します。
@@ -374,6 +367,7 @@ export default function SubscriptionSettingsPage() {
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <a href="/">◀ ホームに戻る</a>
       </div>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

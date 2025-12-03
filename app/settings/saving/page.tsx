@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type SavingGoal = {
   id: string;
@@ -34,15 +35,6 @@ function calcMonthlyAmount(goal: SavingGoal): number | null {
 export default function SavingSettingsPage() {
   const [goals, setGoals] = useState<SavingGoal[]>([]);
   const [message, setMessage] = useState<string>("");
-
-  // ★ ログインチェック（他の設定ページと同じパターン）
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const user = window.localStorage.getItem("authUser"); // ログイン時に入れてるキー名に合わせる
-    if (!user) {
-      window.location.href = "/login"; // 実際のログインページに合わせて
-    }
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -111,7 +103,8 @@ export default function SavingSettingsPage() {
   };
 
   return (
-    <div className="page-container">
+    <ProtectedPage>
+      <div className="page-container">
       <h1>貯金目標の設定</h1>
       <p>
         「いつまでに、いくら貯めたいか」を登録します。
@@ -257,6 +250,7 @@ export default function SavingSettingsPage() {
       <div style={{ marginTop: 24 }}>
         <Link href="/settings">◀ 設定トップに戻る</Link>
       </div>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

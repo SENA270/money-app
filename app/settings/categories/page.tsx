@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ProtectedPage from "../../components/ProtectedPage";
 
 type CategoryType = "expense" | "income";
 
@@ -54,15 +55,6 @@ function createDefaultCategories(): Category[] {
 }
 
 export default function CategoryAndBudgetSettingsPage() {
-  // ★ ログインしていなければ /login に飛ばす（今までと同じスタイル）
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const user = window.localStorage.getItem("authUser"); // ここは使ってるキー名に合わせて
-    if (!user) {
-      window.location.href = "/login"; // ログインページのパスに合わせて
-    }
-  }, []);
-
   // カテゴリ
   const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
@@ -267,7 +259,8 @@ export default function CategoryAndBudgetSettingsPage() {
   };
 
   return (
-    <div className="page-container">
+    <ProtectedPage>
+      <div className="page-container">
       <h1>カテゴリと月別予算の設定</h1>
       <p style={{ fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
         普段使う「支出カテゴリ」「収入カテゴリ」と、
@@ -550,6 +543,7 @@ export default function CategoryAndBudgetSettingsPage() {
       <div style={{ marginTop: 12, fontSize: 13 }}>
         ← <a href="/settings">設定トップに戻る</a>
       </div>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }
