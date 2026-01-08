@@ -412,116 +412,100 @@ function BalancesContent() {
       </p>
 
       {/* 合計残高 */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
+      <div className="app-card" style={{ marginBottom: 24 }}>
         <h2>合計残高</h2>
         <p style={{ marginTop: 4 }}>
           合計：<strong>¥{totalBalance.toLocaleString()}</strong>
         </p>
       </div>
 
-      {/* 銀行口座 */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
-        <h2>【銀行口座】</h2>
-        {bankRows.length === 0 ? (
-          <p>銀行口座が登録されていません。</p>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 14,
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-                <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                  残高（円）
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {bankRows.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ padding: "4px 6px" }}>{r.name}</td>
-                  <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                    ¥{r.balance.toLocaleString()}
-                  </td>
+      <div className="grid-container">
+        {/* 銀行口座 */}
+        <div className="app-card">
+          <h2>【銀行口座】</h2>
+          {bankRows.length === 0 ? (
+            <p>銀行口座が登録されていません。</p>
+          ) : (
+            <table className="table-basic">
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>名称</th>
+                  <th style={{ textAlign: "right" }}>
+                    残高（円）
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {bankRows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.name}</td>
+                    <td style={{ textAlign: "right" }}>
+                      ¥{r.balance.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      {/* 財布 */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
-        <h2>【財布】</h2>
-        {walletRows.length === 0 ? (
-          <p>財布が登録されていません。</p>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 14,
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-                <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                  残高（円）
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {walletRows.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ padding: "4px 6px" }}>{r.name}</td>
-                  <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                    ¥{r.balance.toLocaleString()}
-                  </td>
+        {/* 財布 */}
+        <div className="app-card">
+          <h2>【財布】</h2>
+          {walletRows.length === 0 ? (
+            <p>財布が登録されていません。</p>
+          ) : (
+            <table className="table-basic">
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>名称</th>
+                  <th style={{ textAlign: "right" }}>
+                    残高（円）
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {walletRows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.name}</td>
+                    <td style={{ textAlign: "right" }}>
+                      ¥{r.balance.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      {/* QR */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
-        <h2>【QR】</h2>
-        {qrRows.length === 0 ? (
-          <p>QR残高が登録されていません。</p>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 14,
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-                <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                  残高（円）
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {qrRows.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ padding: "4px 6px" }}>{r.name}</td>
-                  <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                    ¥{r.balance.toLocaleString()}
-                  </td>
+        {/* QR */}
+        <div className="app-card">
+          <h2>【QR】</h2>
+          {qrRows.length === 0 ? (
+            <p>QR残高が登録されていません。</p>
+          ) : (
+            <table className="table-basic">
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>名称</th>
+                  <th style={{ textAlign: "right" }}>
+                    残高（円）
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {qrRows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.name}</td>
+                    <td style={{ textAlign: "right" }}>
+                      ¥{r.balance.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: 16, fontSize: 14 }}>

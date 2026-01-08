@@ -12,6 +12,7 @@ import {
   BarElement,
 } from "chart.js";
 import { Doughnut, Bar } from "react-chartjs-2";
+import { supabase } from "@lib/supabaseClient";
 
 ChartJS.register(
   ArcElement,
@@ -111,25 +112,35 @@ function AnalysisContent() {
     });
   };
 
-  // ① 表示中の月の「収入・支出」「カテゴリ別支出」を集計
+  // ① 表示中の月の「収入・支出」「カテゴリ別支出」を集計（Supabase）
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const load = async () => {
+      // 1. ログイン中ユーザー取得
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("getUser error", userError);
+        return;
+      }
+      const user = userData?.user;
+      if (!user) return;
 
-    const raw = localStorage.getItem("transactions");
-    if (!raw) {
-      setIncomeTotal(0);
-      setExpenseTotal(0);
-      setCategoryTotals({});
-      return;
-    }
+      // 2. そのユーザーの全 transactions を取得
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id);
 
-    try {
-      const txs: Transaction[] = JSON.parse(raw);
+      if (error) {
+        console.error("analysis supabase load error", error);
+        return;
+      }
+
+      // 3. 従来ロジックで集計
       let income = 0;
       let expense = 0;
       const catTotals: { [key: string]: number } = {};
 
-      txs.forEach((t) => {
+      (data || []).forEach((t) => {
         if (!t.date) return;
         const d = new Date(t.date);
         const y = d.getFullYear();
@@ -150,71 +161,86 @@ function AnalysisContent() {
       setIncomeTotal(income);
       setExpenseTotal(expense);
       setCategoryTotals(catTotals);
-    } catch (e) {
-      console.error("analysis: transactions 読み込み失敗", e);
-      setIncomeTotal(0);
-      setExpenseTotal(0);
-      setCategoryTotals({});
-    }
+    };
+
+    load();
   }, [viewYear, viewMonth]);
 
-  // ② 表示中の月の「カード請求額（引き落とし月ベース）」を集計
+  // ② 表示中の月の「カード請求額（引き落とし月ベース）」を集計（Supabase）
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const txRaw = localStorage.getItem("transactions");
-    const accRaw = localStorage.getItem("accounts");
-
-    if (!txRaw || !accRaw) {
-      setCardBillsForMonth({});
-      return;
-    }
-
     try {
-      const txs: Transaction[] = JSON.parse(txRaw);
-      const accounts: Account[] = JSON.parse(accRaw);
+      const load = async () => {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("getUser error", userError);
+          setCardBillsForMonth({});
+          return;
+        }
+        const user = userData?.user;
+        if (!user) {
+          setCardBillsForMonth({});
+          return;
+        }
 
-      const cardAccounts = accounts.filter((a) => a.type === "card");
-      const matchMap = new Map<string, Account>();
+        const { data: txs, error: txError } = await supabase
+          .from("transactions")
+          .select("*")
+          .eq("user_id", user.id);
 
-      cardAccounts.forEach((card) => {
-        const nameKey = card.name?.trim();
-        const payKey = card.paymentKey?.trim();
-        if (nameKey) matchMap.set(nameKey, card);
-        if (payKey) matchMap.set(payKey, card);
-      });
+        if (txError) {
+          console.error("analysis: transactions fetch error", txError);
+          setCardBillsForMonth({});
+          return;
+        }
 
-      const totals: CardBillTotals = {};
+        // カード口座の情報はまだ localStorage 依存なのでそのまま使う
+        const accRaw = localStorage.getItem("accounts");
+        const accounts: Account[] = accRaw ? JSON.parse(accRaw) : [];
 
-      txs.forEach((t) => {
-        if (t.type !== "expense") return;
-        if (!t.payment) return;
+        const cardAccounts = accounts.filter((a) => a.type === "card");
+        const matchMap = new Map<string, Account>();
 
-        const card = matchMap.get(t.payment.trim());
-        if (!card) return;
-        if (card.closingDay == null || card.paymentDay == null) return;
+        cardAccounts.forEach((card) => {
+          const nameKey = card.name?.trim();
+          const payKey = card.paymentKey?.trim();
+          if (nameKey) matchMap.set(nameKey, card);
+          if (payKey) matchMap.set(payKey, card);
+        });
 
-        if (!t.date) return;
-        const useDate = new Date(t.date);
-        if (Number.isNaN(useDate.getTime())) return;
+        const totals: CardBillTotals = {};
 
-        const billDate = calcBillingDate(
-          useDate,
-          card.closingDay ?? 0,
-          card.paymentDay ?? 1
-        );
-        const y = billDate.getFullYear();
-        const m = billDate.getMonth() + 1;
+        (txs || []).forEach((t: Transaction) => {
+          if (t.type !== "expense") return;
+          if (!t.payment) return;
 
-        // 表示中の「請求月」と一致するものだけ
-        if (y !== viewYear || m !== viewMonth) return;
+          const card = matchMap.get(t.payment.trim());
+          if (!card) return;
+          if (card.closingDay == null || card.paymentDay == null) return;
 
-        const key = card.name || "不明なカード";
-        if (!totals[key]) totals[key] = 0;
-        totals[key] += t.amount;
-      });
+          if (!t.date) return;
+          const useDate = new Date(t.date);
+          if (Number.isNaN(useDate.getTime())) return;
 
-      setCardBillsForMonth(totals);
+          const billDate = calcBillingDate(
+            useDate,
+            card.closingDay ?? 0,
+            card.paymentDay ?? 1
+          );
+          const y = billDate.getFullYear();
+          const m = billDate.getMonth() + 1;
+
+          // 表示中の「請求月」と一致するものだけ
+          if (y !== viewYear || m !== viewMonth) return;
+
+          const key = card.name || "不明なカード";
+          if (!totals[key]) totals[key] = 0;
+          totals[key] += t.amount;
+        });
+
+        setCardBillsForMonth(totals);
+      };
+
+      load();
     } catch (e) {
       console.error("analysis: card bills 集計失敗", e);
       setCardBillsForMonth({});
@@ -229,33 +255,33 @@ function AnalysisContent() {
 
   const doughnutData = hasCategoryData
     ? {
-        labels: categoryNames,
-        datasets: [
-          {
-            data: categoryNames.map((c) => categoryTotals[c]),
-            backgroundColor: [
-              "#f2b591",
-              "#e8ddc7",
-              "#c4a484",
-              "#f6c453",
-              "#b9d6a3",
-              "#f7a072",
-              "#c9a0dc",
-            ],
-            borderColor: "#f9f4ea",
-            borderWidth: 2,
-          },
-        ],
-      }
+      labels: categoryNames,
+      datasets: [
+        {
+          data: categoryNames.map((c) => categoryTotals[c]),
+          backgroundColor: [
+            "#f2b591",
+            "#e8ddc7",
+            "#c4a484",
+            "#f6c453",
+            "#b9d6a3",
+            "#f7a072",
+            "#c9a0dc",
+          ],
+          borderColor: "#f9f4ea",
+          borderWidth: 2,
+        },
+      ],
+    }
     : {
-        labels: ["データなし"],
-        datasets: [
-          {
-            data: [1],
-            backgroundColor: ["#e0d6c4"],
-          },
-        ],
-      };
+      labels: ["データなし"],
+      datasets: [
+        {
+          data: [1],
+          backgroundColor: ["#e0d6c4"],
+        },
+      ],
+    };
 
   const doughnutOptions: any = {
     plugins: {
@@ -322,74 +348,68 @@ function AnalysisContent() {
         <button
           type="button"
           onClick={handlePrevMonth}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid #c1a97e",
-            background: "#fef9ed",
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
+          style={{ padding: "4px 12px", minHeight: "32px" }}
         >
           ← 前の月
         </button>
-        <span>表示中: {label}</span>
+        <span style={{ fontWeight: 600 }}>表示中: {label}</span>
         <button
           type="button"
           onClick={handleNextMonth}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid #c1a97e",
-            background: "#fef9ed",
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
+          style={{ padding: "4px 12px", minHeight: "32px" }}
         >
           次の月 →
         </button>
       </div>
 
       {/* 先頭：その月のサマリー */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
+      <div className="app-card" style={{ marginBottom: 24 }}>
         <h2>{label}のサマリー</h2>
-        <p>収入：¥{incomeTotal.toLocaleString()}</p>
-        <p>支出：¥{expenseTotal.toLocaleString()}</p>
-        <p>
-          差額：
-          <span
-            style={{
-              color: diff < 0 ? "#c44536" : "#3b2a1a",
-              fontWeight: 600,
-            }}
-          >
-            ¥{diff.toLocaleString()}
-          </span>
-        </p>
-      </div>
-
-      {/* カテゴリ別 円グラフ */}
-      <div className="app-card" style={{ marginBottom: 16 }}>
-        <h2>カテゴリ別（{label}の支出・円グラフ）</h2>
-        {hasCategoryData ? (
-          <div style={{ maxWidth: 480, margin: "0 auto" }}>
-            <Doughnut data={doughnutData} options={doughnutOptions} />
-          </div>
-        ) : (
-          <p style={{ marginTop: 8 }}>この月の支出データがまだありません。</p>
-        )}
-      </div>
-
-      {/* カード別棒グラフ */}
-      <div className="app-card">
-        <h2>カード別 請求額（{label}）</h2>
-        {hasCardData ? (
-          <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            <Bar data={barData} options={barOptions} />
-          </div>
-        ) : (
-          <p style={{ marginTop: 8 }}>
-            この月に引き落とし予定のカード請求はありません。
+        <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+          <p>収入：¥{incomeTotal.toLocaleString()}</p>
+          <p>支出：¥{expenseTotal.toLocaleString()}</p>
+          <p>
+            差額：
+            <span
+              style={{
+                color: diff < 0 ? "#c44536" : "#3b2a1a",
+                fontWeight: 600,
+              }}
+            >
+              ¥{diff.toLocaleString()}
+            </span>
           </p>
-        )}
+        </div>
+      </div>
+
+      <div className="grid-container">
+        {/* カテゴリ別 円グラフ */}
+        <div className="app-card" style={{ marginBottom: 0 }}>
+          <h2>カテゴリ別（円グラフ）</h2>
+          {hasCategoryData ? (
+            <div style={{ position: "relative", height: "300px", width: "100%" }}>
+              <Doughnut data={doughnutData} options={{ ...doughnutOptions, maintainAspectRatio: false }} />
+            </div>
+          ) : (
+            <p style={{ marginTop: 8 }}>この月の支出データがまだありません。</p>
+          )}
+        </div>
+
+        {/* カード別棒グラフ */}
+        <div className="app-card" style={{ marginBottom: 0 }}>
+          <h2>カード別 請求額</h2>
+          {hasCardData ? (
+            <div style={{ position: "relative", height: "300px", width: "100%" }}>
+              <Bar data={barData} options={{ ...barOptions, maintainAspectRatio: false }} />
+            </div>
+          ) : (
+            <p style={{ marginTop: 8 }}>
+              この月に引き落とし予定のカード請求はありません。
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

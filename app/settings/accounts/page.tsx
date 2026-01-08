@@ -83,32 +83,32 @@ function AccountSettingsInnerPage() {
   // 共通：名称変更（銀行・財布・QR・カード）
   const handleNameChange =
     (type: AccountType, id: string) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      const update = (list: Account[]): Account[] =>
-        list.map((a) => (a.id === id ? { ...a, name: value } : a));
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const update = (list: Account[]): Account[] =>
+          list.map((a) => (a.id === id ? { ...a, name: value } : a));
 
-      if (type === "bank") setBankAccounts((prev) => update(prev));
-      if (type === "wallet") setWalletAccounts((prev) => update(prev));
-      if (type === "qr") setQrAccounts((prev) => update(prev));
-      if (type === "card") setCardAccounts((prev) => update(prev));
-    };
+        if (type === "bank") setBankAccounts((prev) => update(prev));
+        if (type === "wallet") setWalletAccounts((prev) => update(prev));
+        if (type === "qr") setQrAccounts((prev) => update(prev));
+        if (type === "card") setCardAccounts((prev) => update(prev));
+      };
 
   // カード専用：締め日・支払日
   const handleCardNumberChange =
     (id: string, field: "closingDay" | "paymentDay") =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      const num = raw === "" ? undefined : Number(raw);
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value;
+        const num = raw === "" ? undefined : Number(raw);
 
-      setCardAccounts((prev) =>
-        prev.map((a) =>
-          a.id === id
-            ? { ...a, [field]: num && !Number.isNaN(num) ? num : undefined }
-            : a
-        )
-      );
-    };
+        setCardAccounts((prev) =>
+          prev.map((a) =>
+            a.id === id
+              ? { ...a, [field]: num && !Number.isNaN(num) ? num : undefined }
+              : a
+          )
+        );
+      };
 
   // カード専用：内訳キー
   const handleCardPaymentKeyChange =
@@ -183,71 +183,56 @@ function AccountSettingsInnerPage() {
   ) => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>{title}</h2>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "14px",
-        }}
-      >
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-            <th style={{ textAlign: "center", padding: "4px 6px" }}>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((a) => (
-            <tr key={a.id}>
-              <td style={{ padding: "4px 6px" }}>
-                <input
-                  type="text"
-                  value={a.name}
-                  onChange={handleNameChange(type, a.id)}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #ccb89b",
-                  }}
-                />
-              </td>
-              <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveRow(type, a.id)}
-                  style={{
-                    fontSize: "12px",
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    border: "1px solid #c44536",
-                    backgroundColor: "#fff5f3",
-                    color: "#c44536",
-                    cursor: "pointer",
-                  }}
-                >
-                  削除
-                </button>
-              </td>
+      <div style={{ overflowX: "auto" }}>
+        <table className="table-basic" style={{ minWidth: "350px" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>名称</th>
+              <th style={{ textAlign: "center", width: "80px" }}>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((a) => (
+              <tr key={a.id}>
+                <td>
+                  <input
+                    type="text"
+                    value={a.name}
+                    onChange={handleNameChange(type, a.id)}
+                    className="form-input"
+                    placeholder="名称を入力"
+                  />
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRow(type, a.id)}
+                    className="btn-secondary"
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      minHeight: "auto",
+                      backgroundColor: "#fff5f3",
+                      color: "#c44536",
+                      borderColor: "#c44536",
+                    }}
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <button
         type="button"
         onClick={() => handleAddRow(type)}
-        style={{
-          marginTop: 8,
-          fontSize: "13px",
-          padding: "4px 10px",
-          borderRadius: 999,
-          border: "1px solid #b58b5a",
-          backgroundColor: "#fef6e9",
-          cursor: "pointer",
-        }}
+        className="btn-secondary"
+        style={{ marginTop: 12, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
       >
-        行を追加する
+        ＋ 行を追加する
       </button>
     </div>
   );
@@ -255,125 +240,91 @@ function AccountSettingsInnerPage() {
   const renderCardTable = () => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>【カード】</h2>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "14px",
-        }}
-      >
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-            <th style={{ textAlign: "left", padding: "4px 6px" }}>
-              内訳キー（任意）
-            </th>
-            <th style={{ textAlign: "right", padding: "4px 6px" }}>締め日</th>
-            <th style={{ textAlign: "right", padding: "4px 6px" }}>
-              支払日（翌月）
-            </th>
-            <th style={{ textAlign: "center", padding: "4px 6px" }}>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cardAccounts.map((a) => (
-            <tr key={a.id}>
-              <td style={{ padding: "4px 6px" }}>
-                <input
-                  type="text"
-                  value={a.name}
-                  onChange={handleNameChange("card", a.id)}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #ccb89b",
-                  }}
-                />
-              </td>
-              <td style={{ padding: "4px 6px" }}>
-                <input
-                  type="text"
-                  value={a.paymentKey ?? ""}
-                  onChange={handleCardPaymentKeyChange(a.id)}
-                  placeholder="例：セゾンカード家計用"
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #ccb89b",
-                    fontSize: 12,
-                  }}
-                />
-              </td>
-              <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={a.closingDay ?? ""}
-                  onChange={handleCardNumberChange(a.id, "closingDay")}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #ccb89b",
-                    textAlign: "right",
-                  }}
-                />
-              </td>
-              <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={a.paymentDay ?? ""}
-                  onChange={handleCardNumberChange(a.id, "paymentDay")}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #ccb89b",
-                    textAlign: "right",
-                  }}
-                />
-              </td>
-              <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveRow("card", a.id)}
-                  style={{
-                    fontSize: "12px",
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    border: "1px solid #c44536",
-                    backgroundColor: "#fff5f3",
-                    color: "#c44536",
-                    cursor: "pointer",
-                  }}
-                >
-                  削除
-                </button>
-              </td>
+      <div style={{ overflowX: "auto" }}>
+        <table className="table-basic" style={{ minWidth: "600px" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>名称</th>
+              <th style={{ textAlign: "left" }}>内訳キー（任意）</th>
+              <th style={{ textAlign: "right", width: "80px" }}>締め日</th>
+              <th style={{ textAlign: "right", width: "80px" }}>支払日(翌月)</th>
+              <th style={{ textAlign: "center", width: "80px" }}>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {cardAccounts.map((a) => (
+              <tr key={a.id}>
+                <td>
+                  <input
+                    type="text"
+                    value={a.name}
+                    onChange={handleNameChange("card", a.id)}
+                    className="form-input"
+                    placeholder="カード名称"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    value={a.paymentKey ?? ""}
+                    onChange={handleCardPaymentKeyChange(a.id)}
+                    className="form-input"
+                    placeholder="例：セゾンカード"
+                    style={{ fontSize: "13px" }}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={a.closingDay ?? ""}
+                    onChange={handleCardNumberChange(a.id, "closingDay")}
+                    className="form-input"
+                    style={{ textAlign: "right" }}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={a.paymentDay ?? ""}
+                    onChange={handleCardNumberChange(a.id, "paymentDay")}
+                    className="form-input"
+                    style={{ textAlign: "right" }}
+                  />
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRow("card", a.id)}
+                    className="btn-secondary"
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      minHeight: "auto",
+                      backgroundColor: "#fff5f3",
+                      color: "#c44536",
+                      borderColor: "#c44536",
+                    }}
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <button
         type="button"
         onClick={() => handleAddRow("card")}
-        style={{
-          marginTop: 8,
-          fontSize: "13px",
-          padding: "4px 10px",
-          borderRadius: 999,
-          border: "1px solid #b58b5a",
-          backgroundColor: "#fef6e9",
-          cursor: "pointer",
-        }}
+        className="btn-secondary"
+        style={{ marginTop: 12, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
       >
-        行を追加する
+        ＋ 行を追加する
       </button>
     </div>
   );
@@ -394,24 +345,19 @@ function AccountSettingsInnerPage() {
       {renderSimpleTable("qr", qrAccounts, "【QR】")}
       {renderCardTable()}
 
-      <button
-        type="button"
-        onClick={handleSave}
-        style={{
-          marginTop: 16,
-          padding: "8px 16px",
-          borderRadius: 6,
-          border: "none",
-          backgroundColor: "#b58b5a",
-          color: "#fff",
-          cursor: "pointer",
-        }}
-      >
-        すべて保存する
-      </button>
+      <div style={{ marginTop: 24, paddingBottom: 40 }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="btn-primary"
+          style={{ width: "100%", maxWidth: "300px" }}
+        >
+          すべて保存する
+        </button>
+      </div>
 
       <div style={{ marginTop: 16, fontSize: 14 }}>
-        <a href="/">◀ ホームに戻る</a>
+        <a href="/settings">◀ 設定一覧に戻る</a>
       </div>
     </div>
   );

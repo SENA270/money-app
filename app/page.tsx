@@ -8,40 +8,13 @@ import {
   Legend,
 } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
+import { supabase } from "../lib/supabaseClient";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
-
-type TransactionType = "expense" | "income";
-
-type Transaction = {
-  id: string;
-  date: string;
-  amount: number;
-  type: TransactionType;
-  category: string;
-  payment: string;
-  memo: string;
-};
-
-type CategoryBudgetItem = {
-  category: string;
-  amount: number;
-};
-
-type AppSettings = {
-  categoryBudgetsByMonth?: {
-    [monthKey: string]: CategoryBudgetItem[];
-  };
-};
 
 type Totals = {
   [key: string]: number;
 };
-
-function getMonthKey(year: number, month: number): string {
-  const m = String(month).padStart(2, "0");
-  return `${year}-${m}`;
-}
 
 function getRemainingDaysForMonth(
   viewYear: number,
@@ -68,6 +41,7 @@ export default function Home() {
 
   const [categorySpent, setCategorySpent] = useState<Totals>({});
   const [categoryBudget, setCategoryBudget] = useState<Totals>({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const displayMonthLabel = `${viewYear}年${viewMonth}月`;
 
@@ -90,68 +64,6 @@ export default function Home() {
       return prev + 1;
     });
   };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const raw = localStorage.getItem("transactions");
-    if (!raw) return;
-
-    try {
-      const txs: Transaction[] = JSON.parse(raw);
-
-      let totalExpense = 0;
-      const perCategory: Totals = {};
-
-      txs.forEach((t) => {
-        if (!t.date || t.type !== "expense") return;
-        const d = new Date(t.date);
-        const y = d.getFullYear();
-        const m = d.getMonth() + 1;
-
-        if (y !== viewYear || m !== viewMonth) return;
-
-        totalExpense += t.amount;
-        const key = t.category || "その他";
-        if (!perCategory[key]) perCategory[key] = 0;
-        perCategory[key] += t.amount;
-      });
-
-      setMonthlyExpense(totalExpense);
-      setCategorySpent(perCategory);
-    } catch (e) {
-      console.error("取引データの読み込みに失敗しました", e);
-    }
-  }, [viewYear, viewMonth]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const raw = localStorage.getItem("settings");
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw) as AppSettings;
-      const byMonth = parsed.categoryBudgetsByMonth || {};
-      const monthKey = getMonthKey(viewYear, viewMonth);
-      const items = byMonth[monthKey] || [];
-
-      const budgetMap: Totals = {};
-      let total = 0;
-
-      items.forEach((item) => {
-        if (!item.category) return;
-        const amt = Number(item.amount) || 0;
-        budgetMap[item.category] = amt;
-        total += amt;
-      });
-
-      setCategoryBudget(budgetMap);
-      setMonthlyBudgetTotal(total);
-    } catch (e) {
-      console.error("カテゴリ別予算の読み込みに失敗しました", e);
-    }
-  }, [viewYear, viewMonth]);
 
   const rawRemainingTotal = monthlyBudgetTotal - monthlyExpense;
   const isOverAll = rawRemainingTotal < 0;
@@ -236,9 +148,101 @@ export default function Home() {
       ? Math.floor(rawRemainingTotal / remainingDays)
       : null;
 
+  useEffect(() => {
+    const loadBudgets = async () => {
+      console.log("loadBudgets start", { viewYear, viewMonth });
+
+      const userRes = await supabase.auth.getUser();
+      const user = userRes.data.user;
+      if (!user) {
+        console.log("loadBudgets: no user");
+        return;
+      }
+
+      setCurrentUserId(user.id);
+
+      const { data, error } = await supabase
+        .from("category_budgets")
+        .select("category, amount")
+        .eq("user_id", user.id)
+        .eq("year", viewYear)
+        .eq("month", viewMonth);
+
+      console.log("loadBudgets query result", { data, error });
+
+      if (error) {
+        console.error("カテゴリ別予算の読み込みに失敗しました", error);
+        return;
+      }
+
+      const budgetMap: Totals = {};
+      let total = 0;
+
+      (data || []).forEach((item) => {
+        if (!item.category) return;
+        const amt = Number(item.amount) || 0;
+        budgetMap[item.category] = amt;
+        total += amt;
+      });
+
+      console.log("loadBudgets parsed budgets", { budgetMap, total });
+
+      setCategoryBudget(budgetMap);
+      setMonthlyBudgetTotal(total);
+    };
+
+    loadBudgets();
+  }, [viewYear, viewMonth]);
+
+  useEffect(() => {
+    const load = async () => {
+      const userRes = await supabase.auth.getUser();
+      const user = userRes.data.user;
+      if (!user) return;
+
+      const start = new Date(viewYear, viewMonth - 1, 1);
+      const end = new Date(viewYear, viewMonth, 1);
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", start.toISOString())
+        .lt("date", end.toISOString());
+
+      if (error) {
+        console.error("Supabase load error", error);
+        return;
+      }
+
+      let totalExpense = 0;
+      const perCategory: Totals = {};
+
+      data.forEach((t) => {
+        if (t.type !== "expense") return;
+
+        totalExpense += t.amount;
+
+        const key = t.category || "その他";
+        if (!perCategory[key]) perCategory[key] = 0;
+        perCategory[key] += t.amount;
+      });
+
+      setMonthlyExpense(totalExpense);
+      setCategorySpent(perCategory);
+    };
+
+    load();
+  }, [viewYear, viewMonth]);
+
   return (
     <div className="page-container">
       <h1>ホーム</h1>
+      {currentUserId && (
+        <p style={{ fontSize: 12, color: "#555", marginTop: -4 }}>
+          ログイン中ユーザーID: {currentUserId}
+        </p>
+      )}
       <p style={{ marginBottom: "12px" }}>
         月ごとの予算と実績をざっくり確認できるページです。
       </p>

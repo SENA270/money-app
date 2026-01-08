@@ -17,7 +17,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f4eddc; /* 紙っぽいベージュ */
+  background-color: #f4eddc;
+  /* 紙っぽいベージュ */
   color: #3b2a1a;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue",
     Arial, sans-serif;
@@ -81,5 +82,200 @@ a {
 }
 
 a:hover {
+
   text-decoration: underline;
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .app-main {
+    padding: 16px 16px 80px;
+    /* Bottom padding for safety */
+  }
+
+  .app-card {
+    padding: 16px;
+    margin-bottom: 24px;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* Form Utilities */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #5d4330;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  /* Prevents zoom on iOS */
+  border-radius: 6px;
+  border: 1px solid #ccb89b;
+  background-color: #fff;
+  min-height: 44px;
+  /* Touch friendly */
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: 2px solid #b58b5a;
+  border-color: #b58b5a;
+}
+
+.form-radio-group {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.form-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* Button Utilities */
+.btn-primary {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: none;
+  background-color: #b58b5a;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 48px;
+  /* Touch friendly */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #b58b5a;
+  background-color: #fff7ea;
+  font-size: 13px;
+  color: #5d4330;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+/* Header & Nav Utilities */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Header Specific Utilities */
+.header-nav-desktop {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header-hamburger-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 24px;
+  color: #5d4330;
+}
+
+@media (max-width: 768px) {
+  .header-nav-desktop {
+    display: none !important;
+    /* Ensure override of any residual styles */
+  }
+}
+
+.header-menu-overlay {
+  position: fixed;
+  top: 50px;
+  /* Below header approx */
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 50px);
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+}
+
+.header-menu-content {
+  background-color: #fffaf0;
+  border-bottom: 1px solid #c9c3b3;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.logo-text-full {
+  display: inline;
+}
+
+.logo-text-short {
+  display: none;
+}
+
+@media (max-width: 370px) {
+  .logo-text-full {
+    display: none;
+  }
+
+  .logo-text-short {
+    display: inline;
+  }
+}
+
+/* Layout Utilities */
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
 }

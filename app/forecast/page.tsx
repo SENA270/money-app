@@ -2,6 +2,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // ---------- 型定義 ----------
 
@@ -560,100 +581,112 @@ function ForecastContent() {
     });
   };
 
-  // ---------------------------------------------------
+  // グラフ用データ作成
+  const chartData = {
+    labels: rows.map((r) => r.dateStr.slice(5)), // "MM-DD" style
+    datasets: [
+      {
+        label: "残高推移",
+        data: rows.map((r) => r.balanceAfter),
+        borderColor: "#b58b5a",
+        backgroundColor: "rgba(181, 139, 90, 0.2)",
+        tension: 0.2,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+      },
+    },
+  };
 
   return (
-    <main style={{ padding: "24px" }}>
+    <div className="page-container">
       <h1>資金繰りシミュレーション（6ヶ月）</h1>
-      <p>
+      <p style={{ marginBottom: 16 }}>
         今日時点の残高と「返済」「クレカ請求」「給与」をもとに
         これから6ヶ月の資金推移をシミュレートします。
       </p>
-      <p style={{ fontSize: "14px" }}>
+      <p style={{ fontSize: "14px", marginBottom: 24 }}>
         期間：{periodText} ／ スタート残高：
         <strong>¥{startBalance.toLocaleString()}</strong>
       </p>
 
+      {/* グラフ (スマホでは少し高さを確保) */}
+      <div className="app-card" style={{ height: "300px", marginBottom: 24 }}>
+        <h2>残高推移グラフ</h2>
+        <div style={{ position: "relative", height: "100%", maxHeight: "240px" }}>
+          {rows.length > 0 ? (
+            <Line data={chartData} options={chartOptions} />
+          ) : (
+            <p>データがありません</p>
+          )}
+        </div>
+      </div>
+
       {/* 6ヶ月シミュレーション結果 */}
-      <div
-        style={{
-          background: "#fef9ed",
-          padding: "20px",
-          borderRadius: "10px",
-          marginTop: "20px",
-          maxWidth: "720px",
-          border: "1px solid #e0c9a7",
-        }}
-      >
+      <div className="app-card" style={{ marginBottom: 24 }}>
         <h2>シミュレーション結果</h2>
 
         {rows.length === 0 ? (
           <p>データがありません。</p>
         ) : (
-          <table
-            style={{
-              width: "100%",
-              fontSize: "14px",
-              borderCollapse: "collapse",
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "4px 6px" }}>日付</th>
-                <th style={{ textAlign: "left", padding: "4px 6px" }}>内容</th>
-                <th style={{ textAlign: "right", padding: "4px 6px" }}>金額</th>
-                <th style={{ textAlign: "right", padding: "4px 6px" }}>残高</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const neg = r.balanceAfter < 0;
-                return (
-                  <tr
-                    key={i}
-                    style={{
-                      backgroundColor: neg
-                        ? "#fbe3e3"
-                        : i % 2 === 0
-                        ? "#fffaf0"
-                        : "#fff5e5",
-                    }}
-                  >
-                    <td style={{ padding: "4px 6px" }}>{r.dateStr}</td>
-                    <td style={{ padding: "4px 6px" }}>{r.label}</td>
-                    <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                      {r.amount < 0 ? "-" : "+"}
-                      ¥{Math.abs(r.amount).toLocaleString()}
-                    </td>
-                    <td
+          <div style={{ overflowX: "auto" }}>
+            <table className="table-basic" style={{ minWidth: "500px" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>日付</th>
+                  <th style={{ textAlign: "left" }}>内容</th>
+                  <th style={{ textAlign: "right" }}>金額</th>
+                  <th style={{ textAlign: "right" }}>残高</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const neg = r.balanceAfter < 0;
+                  return (
+                    <tr
+                      key={i}
                       style={{
-                        padding: "4px 6px",
-                        textAlign: "right",
-                        fontWeight: neg ? "bold" : "normal",
-                        color: neg ? "#b3261e" : "#333",
+                        backgroundColor: neg ? "#fbe3e3" : "inherit",
                       }}
                     >
-                      ¥{r.balanceAfter.toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td>{r.dateStr}</td>
+                      <td>{r.label}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {r.amount < 0 ? "-" : "+"}
+                        ¥{Math.abs(r.amount).toLocaleString()}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontWeight: neg ? "bold" : "normal",
+                          color: neg ? "#b3261e" : "inherit",
+                        }}
+                      >
+                        ¥{r.balanceAfter.toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* 今月〜来月の請求一覧 */}
-      <div
-        style={{
-          marginTop: "32px",
-          background: "#f7f2ea",
-          padding: "20px",
-          borderRadius: "10px",
-          maxWidth: "720px",
-          border: "1px solid #d5c7a8",
-        }}
-      >
+      <div className="app-card">
         <h2>今月〜来月の請求予定一覧</h2>
         <p style={{ marginBottom: 12, fontSize: 13, color: "#5b4b3a" }}>
           カード利用分と「返済」「サブスク」から計算した
@@ -664,25 +697,13 @@ function ForecastContent() {
           <p>対象期間の請求データがありません。</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "13px",
-              }}
-            >
+            <table className="table-basic" style={{ minWidth: "500px" }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>
-                    引き落とし日
-                  </th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>項目</th>
-                  <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                    金額
-                  </th>
-                  <th style={{ textAlign: "center", padding: "4px 6px" }}>
-                    入金状況
-                  </th>
+                  <th style={{ textAlign: "left" }}>引き落とし日</th>
+                  <th style={{ textAlign: "left" }}>項目</th>
+                  <th style={{ textAlign: "right" }}>金額</th>
+                  <th style={{ textAlign: "center" }}>入金状況</th>
                 </tr>
               </thead>
               <tbody>
@@ -690,35 +711,23 @@ function ForecastContent() {
                   const isPaid = paidBills[bill.id] ?? false;
                   return (
                     <tr key={bill.id}>
-                      <td style={{ padding: "4px 6px" }}>{bill.date}</td>
-                      <td style={{ padding: "4px 6px" }}>{bill.label}</td>
-                      <td
-                        style={{
-                          padding: "4px 6px",
-                          textAlign: "right",
-                        }}
-                      >
+                      <td>{bill.date}</td>
+                      <td>{bill.label}</td>
+                      <td style={{ textAlign: "right" }}>
                         ¥{bill.amount.toLocaleString()}
                       </td>
-                      <td
-                        style={{
-                          padding: "4px 6px",
-                          textAlign: "center",
-                        }}
-                      >
+                      <td style={{ textAlign: "center" }}>
                         <button
                           type="button"
                           onClick={() => togglePaid(bill.id)}
+                          className={`btn-secondary`}
                           style={{
                             fontSize: "12px",
-                            padding: "2px 10px",
-                            borderRadius: "999px",
-                            border: isPaid
-                              ? "1px solid #4f8f3a"
-                              : "1px solid #c44536",
+                            padding: "4px 10px",
+                            minHeight: "auto",
                             backgroundColor: isPaid ? "#edf7ec" : "#fff5f3",
                             color: isPaid ? "#2f7d32" : "#c44536",
-                            cursor: "pointer",
+                            borderColor: isPaid ? "#4f8f3a" : "#c44536"
                           }}
                         >
                           {isPaid ? "入金済み" : "未入金"}
@@ -733,8 +742,10 @@ function ForecastContent() {
         )}
       </div>
 
-      <div style={{ marginTop: "12px" }}>← ホームに戻る</div>
-    </main>
+      <div style={{ marginTop: "24px" }}>
+        <a href="/">← ホームに戻る</a>
+      </div>
+    </div>
   );
 }
 

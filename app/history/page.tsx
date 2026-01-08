@@ -3,19 +3,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { supabase } from "../../lib/supabaseClient";
 
 type TransactionType = "expense" | "income";
 
-// createdAt を追加（無いデータもある想定なので ? にしておく）
 type Transaction = {
   id: string;
-  date: string; // "2025-11-21" or "2025-11-21T10:30"
+  user_id: string;
+  date: string; // "2025-11-21"
   amount: number;
   type: TransactionType;
   category: string;
   payment: string;
   memo: string;
-  createdAt?: string; // 追加
+  created_at?: string | null;
 };
 
 // "2025-11-26" -> "2025-11"
@@ -41,37 +42,52 @@ function formatDate(dateStr: string) {
 function HistoryContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
-  // 一度だけ localStorage から全件読み込み
+  // Supabase から全件読み込み
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = localStorage.getItem("transactions");
-    if (!raw) return;
-
     try {
-      const list = JSON.parse(raw) as Transaction[];
+      const fetchTx = async () => {
+        setLoading(true);
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("getUser error", userError);
+          setLoading(false);
+          return;
+        }
+        const user = userData?.user;
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
-      // 一旦「全件を新しい順」にソートしておく（念のため）
-      const sorted = [...list].sort((a, b) => {
-        const ta = new Date(a.date).getTime();
-        const tb = new Date(b.date).getTime();
-        if (tb !== ta) return tb - ta;
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false });
 
-        // 日付が同じなら createdAt の新しい順
-        const ca = a.createdAt ? new Date(a.createdAt).getTime() : ta;
-        const cb = b.createdAt ? new Date(b.createdAt).getTime() : tb;
-        return cb - ca;
-      });
+        if (error) {
+          console.error("transactions fetch error", error);
+          setLoading(false);
+          return;
+        }
 
-      setTransactions(sorted);
+        const list = (data || []) as Transaction[];
+        setTransactions(list);
 
-      // デフォルト選択を「一番新しい月」にしておく
-      if (sorted.length > 0) {
-        const newestMonth = toYearMonth(sorted[0].date);
-        setSelectedMonth(newestMonth);
-      }
+        if (list.length > 0) {
+          const newestMonth = toYearMonth(list[0].date);
+          setSelectedMonth(newestMonth);
+        }
+        setLoading(false);
+      };
+
+      fetchTx();
     } catch (e) {
       console.error("取引データの読み込みに失敗しました", e);
+      setLoading(false);
     }
   }, []);
 
@@ -96,33 +112,42 @@ function HistoryContent() {
       ? transactions.filter((t) => toYearMonth(t.date) === selectedMonth)
       : [...transactions];
 
-    // 日付の新しい順 → 同じ日なら createdAt の新しい順
+    // 日付の新しい順 → 同じ日なら created_at の新しい順
     return [...base].sort((a, b) => {
       const ta = new Date(a.date).getTime();
       const tb = new Date(b.date).getTime();
       if (tb !== ta) return tb - ta;
 
-      const ca = a.createdAt ? new Date(a.createdAt).getTime() : ta;
-      const cb = b.createdAt ? new Date(b.createdAt).getTime() : tb;
+      const ca = a.created_at ? new Date(a.created_at).getTime() : ta;
+      const cb = b.created_at ? new Date(b.created_at).getTime() : tb;
       return cb - ca;
     });
   }, [transactions, selectedMonth]);
 
   // 削除処理（1件）
-  const handleDelete = (id: string) => {
-    if (typeof window === "undefined") return;
+  const handleDelete = async (id: string) => {
     const ok = window.confirm("この明細を削除しますか？");
     if (!ok) return;
 
-    setTransactions((prev) => {
-      const updated = prev.filter((t) => t.id !== id);
-      try {
-        localStorage.setItem("transactions", JSON.stringify(updated));
-      } catch (e) {
-        console.error("取引データの保存に失敗しました", e);
-      }
-      return updated;
-    });
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      console.error("ユーザー取得に失敗しました", userError);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userData.user.id);
+
+    if (error) {
+      console.error("削除に失敗しました", error);
+      alert("削除に失敗しました。時間をおいて再度お試しください。");
+      return;
+    }
+
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
   };
 
   const totalIncome = visibleTransactions
@@ -140,8 +165,10 @@ function HistoryContent() {
         月ごとに明細を表示します。不要な行はここから削除・編集できます。
       </p>
 
+      {loading && <p>読み込み中...</p>}
+
       {/* 月選択ボタン */}
-      {months.length > 0 && (
+      {!loading && months.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <span style={{ marginRight: 8 }}>表示する月：</span>
           {months.map((ym) => {
@@ -185,73 +212,49 @@ function HistoryContent() {
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table
+              className="table-basic"
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "13px",
+                minWidth: "600px", // Force scroll on mobile
+                whiteSpace: "nowrap",
               }}
             >
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>日付</th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>種類</th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>
-                    カテゴリ
-                  </th>
-                  <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                    金額
-                  </th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>
-                    支払い方法
-                  </th>
-                  <th style={{ textAlign: "left", padding: "4px 6px" }}>メモ</th>
-                  <th style={{ textAlign: "center", padding: "4px 6px" }}>
-                    操作
-                  </th>
+                  <th style={{ textAlign: "left" }}>日付</th>
+                  <th style={{ textAlign: "left" }}>種類</th>
+                  <th style={{ textAlign: "left" }}>カテゴリ</th>
+                  <th style={{ textAlign: "right" }}>金額</th>
+                  <th style={{ textAlign: "left" }}>支払い方法</th>
+                  <th style={{ textAlign: "left" }}>メモ</th>
+                  <th style={{ textAlign: "center" }}>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleTransactions.map((t) => (
                   <tr key={t.id}>
-                    <td style={{ padding: "4px 6px" }}>{formatDate(t.date)}</td>
-                    <td style={{ padding: "4px 6px" }}>
-                      {t.type === "income" ? "収入" : "支出"}
-                    </td>
-                    <td style={{ padding: "4px 6px" }}>{t.category}</td>
+                    <td>{formatDate(t.date)}</td>
+                    <td>{t.type === "income" ? "収入" : "支出"}</td>
+                    <td>{t.category}</td>
                     <td
                       style={{
-                        padding: "4px 6px",
                         textAlign: "right",
                         color: t.type === "expense" ? "#c44536" : "#2f7d32",
+                        fontWeight: 600,
                       }}
                     >
                       {t.type === "expense" ? "-" : "+"}
                       ¥{t.amount.toLocaleString()}
                     </td>
-                    <td style={{ padding: "4px 6px" }}>{t.payment}</td>
-                    <td style={{ padding: "4px 6px" }}>{t.memo}</td>
-                    <td
-                      style={{
-                        padding: "4px 6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          gap: 8,
-                        }}
-                      >
+                    <td>{t.payment}</td>
+                    <td>{t.memo}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <div style={{ display: "inline-flex", gap: 8 }}>
                         <Link
                           href={`/input?id=${t.id}`}
+                          className="btn-link"
                           style={{
-                            fontSize: "12px",
-                            padding: "2px 10px",
-                            borderRadius: "999px",
-                            border: "1px solid #8a6b3f",
-                            backgroundColor: "#fff8e8",
-                            color: "#8a6b3f",
                             textDecoration: "none",
+                            padding: "6px 12px", // Larger touch target
                           }}
                         >
                           編集
@@ -259,14 +262,12 @@ function HistoryContent() {
                         <button
                           type="button"
                           onClick={() => handleDelete(t.id)}
+                          className="btn-link"
                           style={{
-                            fontSize: "12px",
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            border: "1px solid #c44536",
-                            backgroundColor: "#fff5f3",
+                            borderColor: "#c44536",
                             color: "#c44536",
-                            cursor: "pointer",
+                            backgroundColor: "#fff5f3",
+                            padding: "6px 12px", // Larger touch target
                           }}
                         >
                           削除

@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type AccountType = "bank" | "wallet" | "qr" | "card";
 
@@ -119,26 +120,22 @@ export default function IncomeSettingsPage() {
         登録した内容は資産ページやシミュレーションに自動反映されます。
       </p>
 
-      <div className="app-card" style={{ maxWidth: 420 }}>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: "block", fontSize: 14, marginBottom: 4 }}>
+      <div className="app-card" style={{ maxWidth: 480 }}>
+        <div className="form-group">
+          <label className="form-label">
             月の固定収入（円）
           </label>
           <input
             type="number"
             value={monthlyIncome}
             onChange={(e) => setMonthlyIncome(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-            }}
+            className="form-input"
+            placeholder="例：250000"
           />
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: "block", fontSize: 14, marginBottom: 4 }}>
+        <div className="form-group">
+          <label className="form-label">
             給料日（1〜31）
           </label>
           <input
@@ -147,37 +144,27 @@ export default function IncomeSettingsPage() {
             max={31}
             value={payday}
             onChange={(e) => setPayday(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-            }}
+            className="form-input"
           />
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: "block", fontSize: 14, marginBottom: 4 }}>
+        <div className="form-group">
+          <label className="form-label">
             給料の開始日（最初にこの額が振り込まれる日）
           </label>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-            }}
+            className="form-input"
           />
           <p style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
             例）2025-12-25 を指定すると、その日以降の給料日からシミュレーションと資産に反映されます。
           </p>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontSize: 14, marginBottom: 4 }}>
+        <div className="form-group">
+          <label className="form-label">
             給料の振込先口座
           </label>
           {bankAccounts.length === 0 ? (
@@ -190,12 +177,7 @@ export default function IncomeSettingsPage() {
             <select
               value={depositAccountId}
               onChange={(e) => setDepositAccountId(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-select"
             >
               <option value="">口座を選択してください</option>
               {bankAccounts.map((a) => (
@@ -207,21 +189,16 @@ export default function IncomeSettingsPage() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          style={{
-            width: "100%",
-            padding: "8px 0",
-            borderRadius: 6,
-            border: "none",
-            backgroundColor: "#b58b5a",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          保存する
-        </button>
+        <div style={{ marginTop: 24 }}>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="btn-primary"
+            style={{ width: "100%" }}
+          >
+            保存する
+          </button>
+        </div>
       </div>
 
       <div style={{ marginTop: 16, fontSize: 14 }}>

@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "../../lib/supabaseClient";
 
 type TransactionType = "expense" | "income";
 
@@ -13,7 +15,7 @@ type Transaction = {
   category: string;
   payment: string; // 支払い方法
   memo: string;
-  createdAt?: string;
+  created_at?: string;
 };
 
 type AccountType = "bank" | "wallet" | "qr" | "card" | string;
@@ -45,6 +47,11 @@ type PendingReceiptPayload = {
 };
 
 function InputInnerPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const isEditMode = Boolean(id);
+
   // フォームの状態
   const [date, setDate] = useState<string>(() => {
     const d = new Date();
@@ -83,12 +90,15 @@ function InputInnerPage() {
       setPaymentOptions(names);
 
       if (names.length > 0) {
-        setPayment((prev) => prev || names[0]);
+        setPayment((prev) => {
+          if (isEditMode && prev) return prev;
+          return prev || names[0];
+        });
       }
     } catch (e) {
       console.error("accounts の読み込みに失敗しました", e);
     }
-  }, []);
+  }, [isEditMode]);
 
   // ② カテゴリ候補
   useEffect(() => {
@@ -125,6 +135,8 @@ function InputInnerPage() {
 
   // ③ 種別が変わったときのカテゴリ初期値
   useEffect(() => {
+    if (isEditMode && category) return;
+
     if (type === "expense") {
       if (expenseCategories.length > 0) {
         setCategory((prev) =>
@@ -146,7 +158,7 @@ function InputInnerPage() {
         setCategory("");
       }
     }
-  }, [type, expenseCategories, incomeCategories]);
+  }, [type, expenseCategories, incomeCategories, isEditMode, category]);
 
   // ④ レシートからの反映：localStorage を読む共通処理
   const applyPendingReceipt = (payload: PendingReceiptPayload | null) => {
@@ -252,8 +264,52 @@ function InputInnerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 編集モード時：初期値を取得
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchExisting = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("ユーザー取得に失敗しました", userError);
+        return;
+      }
+
+      const user = userData?.user;
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        console.error("既存データの取得に失敗しました", error);
+        return;
+      }
+
+      if (!data) return;
+
+      const tx = data as Transaction;
+      setDate(tx.date ?? "");
+      setType(tx.type === "income" ? "income" : "expense");
+      setAmount(
+        typeof tx.amount === "number" && !Number.isNaN(tx.amount)
+          ? String(tx.amount)
+          : ""
+      );
+      setCategory(tx.category ?? "");
+      setPayment(tx.payment ?? "");
+      setMemo(tx.memo ?? "");
+    };
+
+    fetchExisting();
+  }, [id]);
+
   // 保存処理
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) {
       alert("金額を入力してください。");
@@ -268,27 +324,54 @@ function InputInnerPage() {
       return;
     }
 
-    if (typeof window === "undefined") return;
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error("ユーザー取得に失敗しました", userError);
+      alert("ユーザー情報の取得に失敗しました。再度ログインしてください。");
+      return;
+    }
 
-    const txRaw = localStorage.getItem("transactions");
-    const list: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
+    const user = userData?.user;
+    if (!user) {
+      alert("ログインしてください。");
+      return;
+    }
 
-    const nowIso = new Date().toISOString();
+    const { error } = id
+      ? await supabase
+        .from("transactions")
+        .update({
+          date,
+          amount: Number(amount),
+          type,
+          category,
+          payment,
+          memo,
+        })
+        .eq("id", id)
+        .eq("user_id", user.id)
+      : await supabase.from("transactions").insert({
+        user_id: user.id,
+        date,
+        amount: Number(amount),
+        type,
+        category,
+        payment,
+        memo,
+      });
 
-    const newTx: Transaction = {
-      id: `tx-${Date.now()}`,
-      date,
-      amount: Number(amount),
-      type,
-      category,
-      payment,
-      memo,
-      createdAt: nowIso,
-    };
+    if (error) {
+      console.error("Supabase insert error", error);
+      alert("保存に失敗しました。時間をおいて再度お試しください。");
+      return;
+    }
 
-    list.push(newTx);
-    localStorage.setItem("transactions", JSON.stringify(list));
     alert("保存しました。");
+
+    if (id) {
+      router.push("/history");
+      return;
+    }
 
     setAmount("");
     setMemo("");
@@ -300,7 +383,7 @@ function InputInnerPage() {
 
   return (
     <div className="page-container">
-      <h1>入力</h1>
+      <h1>入力{isEditMode ? "（編集）" : ""}</h1>
       <p style={{ marginBottom: 12, fontSize: 14 }}>
         日々の支出・収入を登録するページです。
         <br />
@@ -308,18 +391,11 @@ function InputInnerPage() {
       </p>
 
       {/* レシートから読み取るボタン */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <button
           type="button"
           onClick={() => setShowReceiptModal(true)}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 999,
-            border: "1px solid #b58b5a",
-            backgroundColor: "#fff7ea",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
         >
           📷 レシートから読み取る
         </button>
@@ -331,42 +407,21 @@ function InputInnerPage() {
         style={{ maxWidth: 480 }}
       >
         {/* 日付 */}
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            日付
-          </label>
+        <div className="form-group">
+          <label className="form-label">日付</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-            }}
+            className="form-input"
           />
         </div>
 
         {/* 種別 */}
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            種別
-          </label>
-          <div style={{ display: "flex", gap: 16, fontSize: 14 }}>
-            <label>
+        <div className="form-group">
+          <label className="form-label">種別</label>
+          <div className="form-radio-group">
+            <label className="form-radio-label">
               <input
                 type="radio"
                 value="expense"
@@ -375,7 +430,7 @@ function InputInnerPage() {
               />{" "}
               支出
             </label>
-            <label>
+            <label className="form-radio-label">
               <input
                 type="radio"
                 value="income"
@@ -388,51 +443,25 @@ function InputInnerPage() {
         </div>
 
         {/* 金額 */}
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            金額（円）
-          </label>
+        <div className="form-group">
+          <label className="form-label">金額（円）</label>
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-              textAlign: "right",
-            }}
+            className="form-input"
+            style={{ textAlign: "right" }}
           />
         </div>
 
         {/* カテゴリ */}
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            カテゴリ
-          </label>
+        <div className="form-group">
+          <label className="form-label">カテゴリ</label>
           {hasCategory ? (
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-select"
             >
               {currentCategoryOptions.map((c) => (
                 <option key={c} value={c}>
@@ -441,38 +470,20 @@ function InputInnerPage() {
               ))}
             </select>
           ) : (
-            <p
-              style={{
-                fontSize: 13,
-                color: "#b3261e",
-              }}
-            >
+            <p style={{ fontSize: 13, color: "#b3261e" }}>
               カテゴリが未設定です。「設定 &gt; カテゴリ」から登録してください。
             </p>
           )}
         </div>
 
         {/* 支払い方法 */}
-        <div style={{ marginBottom: 12 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            支払い方法
-          </label>
+        <div className="form-group">
+          <label className="form-label">支払い方法</label>
           {paymentOptions.length > 0 ? (
             <select
               value={payment}
               onChange={(e) => setPayment(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-select"
             >
               {paymentOptions.map((p) => (
                 <option key={p} value={p}>
@@ -481,54 +492,25 @@ function InputInnerPage() {
               ))}
             </select>
           ) : (
-            <p
-              style={{
-                fontSize: 13,
-                color: "#b3261e",
-              }}
-            >
+            <p style={{ fontSize: 13, color: "#b3261e" }}>
               口座や財布が未登録です。「設定 &gt; 残高設定」から登録してください。
             </p>
           )}
         </div>
 
         {/* メモ */}
-        <div style={{ marginBottom: 16 }}>
-          <label
-            style={{
-              fontSize: 14,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            メモ（任意）
-          </label>
+        <div className="form-group" style={{ marginBottom: 24 }}>
+          <label className="form-label">メモ（任意）</label>
           <input
             type="text"
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="例：コンビニ、サブスクなど"
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              borderRadius: 4,
-              border: "1px solid #ccb89b",
-            }}
+            className="form-input"
           />
         </div>
 
-        <button
-          type="submit"
-          style={{
-            width: "100%",
-            padding: "8px 16px",
-            borderRadius: 6,
-            border: "none",
-            backgroundColor: "#b58b5a",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
+        <button type="submit" className="btn-primary">
           保存する
         </button>
       </form>

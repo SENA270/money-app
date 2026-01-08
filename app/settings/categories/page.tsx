@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "../../../lib/supabaseClient";
+import Link from "next/link";
 
 type CategoryType = "expense" | "income";
 
@@ -18,7 +20,6 @@ type CategoryBudgetsByMonth = {
 };
 
 const CATEGORIES_KEY = "categories";
-const CATEGORY_BUDGETS_KEY = "categoryBudgetsByMonth";
 
 // YYYY-MM 形式の現在の月
 function getCurrentMonthStr(): string {
@@ -69,41 +70,69 @@ export default function CategoryAndBudgetSettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let loadedCategories: Category[] = [];
+
     // カテゴリ
     try {
       const raw = localStorage.getItem(CATEGORIES_KEY);
-      let loaded: Category[];
-
       if (!raw) {
-        loaded = createDefaultCategories();
+        loadedCategories = createDefaultCategories();
       } else {
-        loaded = JSON.parse(raw) as Category[];
-        if (!Array.isArray(loaded) || loaded.length === 0) {
-          loaded = createDefaultCategories();
+        loadedCategories = JSON.parse(raw) as Category[];
+        if (!Array.isArray(loadedCategories) || loadedCategories.length === 0) {
+          loadedCategories = createDefaultCategories();
         }
       }
 
-      setExpenseCategories(loaded.filter((c) => c.type === "expense"));
-      setIncomeCategories(loaded.filter((c) => c.type === "income"));
+      setExpenseCategories(loadedCategories.filter((c) => c.type === "expense"));
+      setIncomeCategories(loadedCategories.filter((c) => c.type === "income"));
     } catch (e) {
       console.error("categories 読み込み失敗", e);
-      const def = createDefaultCategories();
-      setExpenseCategories(def.filter((c) => c.type === "expense"));
-      setIncomeCategories(def.filter((c) => c.type === "income"));
+      loadedCategories = createDefaultCategories();
+      setExpenseCategories(loadedCategories.filter((c) => c.type === "expense"));
+      setIncomeCategories(loadedCategories.filter((c) => c.type === "income"));
     }
 
-    // 予算
-    try {
-      const rawBudgets = localStorage.getItem(CATEGORY_BUDGETS_KEY);
-      if (!rawBudgets) return;
-
-      const parsed = JSON.parse(rawBudgets) as CategoryBudgetsByMonth;
-      if (parsed && typeof parsed === "object") {
-        setBudgetsByMonth(parsed);
+    const loadBudgets = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("getUser error", userError);
+        return;
       }
-    } catch (e) {
-      console.error("categoryBudgetsByMonth 読み込み失敗", e);
-    }
+      const user = userData?.user;
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("category_budgets")
+        .select("year, month, category, amount")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("category_budgets fetch error", error);
+        return;
+      }
+
+      const idByName = new Map<string, string>();
+      loadedCategories.forEach((c) => {
+        if (c.name) {
+          idByName.set(c.name, c.id);
+        }
+      });
+
+      const next: CategoryBudgetsByMonth = {};
+      (data || []).forEach((row) => {
+        if (!row) return;
+        const monthKey = `${row.year}-${String(row.month).padStart(2, "0")}`;
+        const catId = idByName.get(row.category) ?? row.category;
+        const amt = Number(row.amount) || 0;
+        if (!next[monthKey]) next[monthKey] = {};
+        next[monthKey][catId] = amt;
+      });
+
+      setBudgetsByMonth(next);
+    };
+
+    loadBudgets();
   }, []);
 
   // ある月＋カテゴリの予算を取得
@@ -240,21 +269,77 @@ export default function CategoryAndBudgetSettingsPage() {
       cleanedBudgets[m] = { ...baseBudget };
     }
 
-    // 保存
-    try {
-      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(allCategories));
-      localStorage.setItem(
-        CATEGORY_BUDGETS_KEY,
-        JSON.stringify(cleanedBudgets)
-      );
+    const upsertBudgets = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("getUser error", userError);
+        alert("ユーザー情報の取得に失敗しました。再度ログインしてください。");
+        return;
+      }
+      const user = userData?.user;
+      if (!user) {
+        alert("ログインしてください。");
+        return;
+      }
+
+      const idToName = new Map<string, string>();
+      allCategories.forEach((c) => {
+        if (c.id && c.name) {
+          idToName.set(c.id, c.name);
+        }
+      });
+
+      const rows: {
+        user_id: string;
+        year: number;
+        month: number;
+        category: string;
+        amount: number;
+      }[] = [];
+
+      for (const [monthKey, monthBudget] of Object.entries(cleanedBudgets)) {
+        const [yStr, mStr] = monthKey.split("-");
+        const year = Number(yStr);
+        const month = Number(mStr);
+        if (!year || !month) continue;
+
+        for (const [catId, amount] of Object.entries(monthBudget)) {
+          const name = idToName.get(catId) || "";
+          if (!name) continue;
+
+          rows.push({
+            user_id: user.id,
+            year,
+            month,
+            category: name,
+            amount: Number(amount) || 0,
+          });
+        }
+      }
+
+      const { error } = await supabase
+        .from("category_budgets")
+        .upsert(rows, { onConflict: "user_id,year,month,category" });
+
+      if (error) {
+        console.error("カテゴリ別予算の保存に失敗しました", error);
+        alert("保存中にエラーが発生しました。時間をおいて再度お試しください。");
+        return;
+      }
+
+      try {
+        localStorage.setItem(CATEGORIES_KEY, JSON.stringify(allCategories));
+      } catch (e) {
+        console.error("カテゴリの保存に失敗しました", e);
+      }
+
       setExpenseCategories(cleanedExpense);
       setIncomeCategories(cleanedIncome);
       setBudgetsByMonth(cleanedBudgets);
       alert("カテゴリと予算を保存しました。");
-    } catch (e) {
-      console.error("保存に失敗しました", e);
-      alert("保存中にエラーが発生しました。");
-    }
+    };
+
+    upsertBudgets();
   };
 
   return (
@@ -288,11 +373,8 @@ export default function CategoryAndBudgetSettingsPage() {
               type="month"
               value={targetMonth}
               onChange={(e) => setTargetMonth(e.target.value)}
-              style={{
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-input"
+              style={{ width: "auto" }}
             />
           </div>
 
@@ -300,20 +382,17 @@ export default function CategoryAndBudgetSettingsPage() {
             <label style={{ display: "block", marginBottom: 4 }}>
               同じ内容を適用する月数
             </label>
-            <input
-              type="number"
-              min={1}
-              value={monthsToCopy}
-              onChange={(e) => setMonthsToCopy(e.target.value)}
-              style={{
-                width: 80,
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-                textAlign: "right",
-              }}
-            />{" "}
-            ヶ月分
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="number"
+                min={1}
+                value={monthsToCopy}
+                onChange={(e) => setMonthsToCopy(e.target.value)}
+                className="form-input"
+                style={{ width: 80, textAlign: "right" }}
+              />
+              <span>ヶ月分</span>
+            </div>
           </div>
 
           <div style={{ marginLeft: "auto", fontSize: 13, color: "#6b5b4a" }}>
@@ -328,53 +407,26 @@ export default function CategoryAndBudgetSettingsPage() {
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 13,
-              }}
-            >
+            <table className="table-basic">
               <thead>
                 <tr>
-                  <th
-                    style={{
-                      textAlign: "left",
-                      padding: "4px 6px",
-                      borderBottom: "1px solid #e0c9a7",
-                    }}
-                  >
-                    カテゴリ
-                  </th>
-                  <th
-                    style={{
-                      textAlign: "right",
-                      padding: "4px 6px",
-                      borderBottom: "1px solid #e0c9a7",
-                    }}
-                  >
-                    予算（円）
-                  </th>
+                  <th style={{ textAlign: "left" }}>カテゴリ</th>
+                  <th style={{ textAlign: "right", width: "160px" }}>予算（円）</th>
                 </tr>
               </thead>
               <tbody>
                 {expenseCategories.map((cat) => (
                   <tr key={cat.id}>
-                    <td style={{ padding: "4px 6px" }}>{cat.name}</td>
-                    <td style={{ padding: "4px 6px", textAlign: "right" }}>
+                    <td>{cat.name}</td>
+                    <td style={{ textAlign: "right" }}>
                       <input
                         type="number"
                         value={getBudget(targetMonth, cat.id) || ""}
                         onChange={(e) =>
                           handleBudgetChange(cat.id, e.target.value)
                         }
-                        style={{
-                          width: 120,
-                          padding: "4px 6px",
-                          borderRadius: 4,
-                          border: "1px solid #ccb89b",
-                          textAlign: "right",
-                        }}
+                        className="form-input"
+                        style={{ width: "100%", textAlign: "right" }}
                       />
                     </td>
                   </tr>
@@ -399,7 +451,7 @@ export default function CategoryAndBudgetSettingsPage() {
               display: "flex",
               alignItems: "center",
               gap: 8,
-              marginBottom: 6,
+              marginBottom: 8,
             }}
           >
             <input
@@ -409,24 +461,20 @@ export default function CategoryAndBudgetSettingsPage() {
                 updateCategoryName("expense", cat.id, e.target.value)
               }
               placeholder="カテゴリ名"
-              style={{
-                flex: 1,
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-input"
+              style={{ flex: 1 }}
             />
             <button
               type="button"
               onClick={() => deleteCategory("expense", cat.id)}
+              className="btn-secondary"
               style={{
-                padding: "2px 10px",
-                fontSize: 12,
-                borderRadius: 999,
-                border: "1px solid #c44536",
+                padding: "4px 10px",
+                fontSize: "12px",
+                minHeight: "auto",
                 backgroundColor: "#fff5f3",
                 color: "#c44536",
-                cursor: "pointer",
+                borderColor: "#c44536",
               }}
             >
               削除
@@ -437,16 +485,8 @@ export default function CategoryAndBudgetSettingsPage() {
         <button
           type="button"
           onClick={() => addCategory("expense")}
-          style={{
-            marginTop: 8,
-            padding: "4px 10px",
-            fontSize: 13,
-            borderRadius: 999,
-            border: "1px solid #b58b5a",
-            backgroundColor: "#fffaf0",
-            color: "#5d4330",
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
+          style={{ marginTop: 8, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
         >
           ＋ 支出カテゴリを追加
         </button>
@@ -467,7 +507,7 @@ export default function CategoryAndBudgetSettingsPage() {
               display: "flex",
               alignItems: "center",
               gap: 8,
-              marginBottom: 6,
+              marginBottom: 8,
             }}
           >
             <input
@@ -477,24 +517,20 @@ export default function CategoryAndBudgetSettingsPage() {
                 updateCategoryName("income", cat.id, e.target.value)
               }
               placeholder="カテゴリ名"
-              style={{
-                flex: 1,
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccb89b",
-              }}
+              className="form-input"
+              style={{ flex: 1 }}
             />
             <button
               type="button"
               onClick={() => deleteCategory("income", cat.id)}
+              className="btn-secondary"
               style={{
-                padding: "2px 10px",
-                fontSize: 12,
-                borderRadius: 999,
-                border: "1px solid #c44536",
+                padding: "4px 10px",
+                fontSize: "12px",
+                minHeight: "auto",
                 backgroundColor: "#fff5f3",
                 color: "#c44536",
-                cursor: "pointer",
+                borderColor: "#c44536",
               }}
             >
               削除
@@ -505,41 +541,26 @@ export default function CategoryAndBudgetSettingsPage() {
         <button
           type="button"
           onClick={() => addCategory("income")}
-          style={{
-            marginTop: 8,
-            padding: "4px 10px",
-            fontSize: 13,
-            borderRadius: 999,
-            border: "1px solid #b58b5a",
-            backgroundColor: "#fffaf0",
-            color: "#5d4330",
-            cursor: "pointer",
-          }}
+          className="btn-secondary"
+          style={{ marginTop: 8, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
         >
           ＋ 収入カテゴリを追加
         </button>
       </section>
 
-      <div style={{ marginTop: 16, textAlign: "right" }}>
+      <div style={{ marginTop: 24, textAlign: "right" }}>
         <button
           type="button"
           onClick={handleSaveAll}
-          style={{
-            padding: "8px 18px",
-            borderRadius: 6,
-            border: "none",
-            backgroundColor: "#b58b5a",
-            color: "#fff",
-            fontSize: 14,
-            cursor: "pointer",
-          }}
+          className="btn-primary"
+          style={{ width: "100%", maxWidth: "300px" }}
         >
           カテゴリと予算を保存する
         </button>
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 13 }}>
-        ← <a href="/settings">設定トップに戻る</a>
+      <div style={{ marginTop: 24, fontSize: 14 }}>
+        <Link href="/settings">← 設定トップへ戻る</Link>
       </div>
     </div>
   );
