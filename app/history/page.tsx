@@ -210,75 +210,150 @@ function HistoryContent() {
         {visibleTransactions.length === 0 ? (
           <p>この月の明細はありません。</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
-              className="table-basic"
-              style={{
-                minWidth: "600px", // Force scroll on mobile
-                whiteSpace: "nowrap",
-              }}
-            >
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>日付</th>
-                  <th style={{ textAlign: "left" }}>種類</th>
-                  <th style={{ textAlign: "left" }}>カテゴリ</th>
-                  <th style={{ textAlign: "right" }}>金額</th>
-                  <th style={{ textAlign: "left" }}>支払い方法</th>
-                  <th style={{ textAlign: "left" }}>メモ</th>
-                  <th style={{ textAlign: "center" }}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTransactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>{formatDate(t.date)}</td>
-                    <td>{t.type === "income" ? "収入" : "支出"}</td>
-                    <td>{t.category}</td>
-                    <td
+          <>
+            {/* Desktop Table View */}
+            <div className="table-wrapper desktop-table-view">
+              <table
+                className="table-basic"
+                style={{
+                  minWidth: "600px",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>日付</th>
+                    <th style={{ textAlign: "left" }}>種類</th>
+                    <th style={{ textAlign: "left" }}>カテゴリ</th>
+                    <th style={{ textAlign: "right" }}>金額</th>
+                    <th style={{ textAlign: "left" }}>支払い方法</th>
+                    <th style={{ textAlign: "left" }}>メモ</th>
+                    <th style={{ textAlign: "center" }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleTransactions.map((t) => (
+                    <tr key={t.id}>
+                      <td>{formatDate(t.date)}</td>
+                      <td>{t.type === "income" ? "収入" : "支出"}</td>
+                      <td>{t.category}</td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          color: t.type === "expense" ? "#c44536" : "#2f7d32",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {t.type === "expense" ? "-" : "+"}
+                        ¥{t.amount.toLocaleString()}
+                      </td>
+                      <td>{t.payment}</td>
+                      <td>{t.memo}</td>
+                      <td style={{ textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", gap: 8 }}>
+                          <Link
+                            href={`/input?id=${t.id}`}
+                            className="btn-link"
+                            style={{
+                              textDecoration: "none",
+                              padding: "6px 12px", // Larger touch target
+                            }}
+                          >
+                            編集
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(t.id)}
+                            className="btn-link"
+                            style={{
+                              borderColor: "#c44536",
+                              color: "#c44536",
+                              backgroundColor: "#fff5f3",
+                              padding: "6px 12px", // Larger touch target
+                            }}
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="mobile-card-view">
+              {visibleTransactions.map((t) => (
+                <div key={t.id} className="list-card-item">
+                  <div className="list-card-row">
+                    <span className="list-card-label">{formatDate(t.date)}</span>
+                    <span
                       style={{
-                        textAlign: "right",
+                        fontSize: "12px",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        backgroundColor: t.type === "expense" ? "#fff5f3" : "#edf7ec",
                         color: t.type === "expense" ? "#c44536" : "#2f7d32",
-                        fontWeight: 600,
+                        border: "1px solid",
+                        borderColor: t.type === "expense" ? "#c44536" : "#4f8f3a"
                       }}
                     >
-                      {t.type === "expense" ? "-" : "+"}
+                      {t.type === "income" ? "収入" : "支出"}
+                    </span>
+                  </div>
+                  <div className="list-card-row">
+                    <span className="list-card-value" style={{ fontSize: "15px" }}>{t.category}</span>
+                    <span
+                      className="list-card-value"
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 600,
+                        color: t.type === "expense" ? "#c44536" : "#2f7d32"
+                      }}
+                    >
                       ¥{t.amount.toLocaleString()}
-                    </td>
-                    <td>{t.payment}</td>
-                    <td>{t.memo}</td>
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: 8 }}>
-                        <Link
-                          href={`/input?id=${t.id}`}
-                          className="btn-link"
-                          style={{
-                            textDecoration: "none",
-                            padding: "6px 12px", // Larger touch target
-                          }}
-                        >
-                          編集
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(t.id)}
-                          className="btn-link"
-                          style={{
-                            borderColor: "#c44536",
-                            color: "#c44536",
-                            backgroundColor: "#fff5f3",
-                            padding: "6px 12px", // Larger touch target
-                          }}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </span>
+                  </div>
+                  <div className="list-card-row">
+                    <span className="list-card-label">支払: {t.payment}</span>
+                  </div>
+                  {t.memo && (
+                    <div className="list-card-row" style={{ marginTop: "4px" }}>
+                      <span className="list-card-label" style={{ fontSize: "11px" }}>{t.memo}</span>
+                    </div>
+                  )}
+                  <div className="list-card-row" style={{ marginTop: "12px", paddingTop: "8px", borderTop: "1px dashed #eee" }}>
+                    <div style={{ display: "flex", gap: "12px", width: "100%", justifyContent: "flex-end" }}>
+                      <Link
+                        href={`/input?id=${t.id}`}
+                        className="btn-link"
+                        style={{
+                          textDecoration: "none",
+                          padding: "6px 16px",
+                          textAlign: "center"
+                        }}
+                      >
+                        編集
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(t.id)}
+                        className="btn-link"
+                        style={{
+                          borderColor: "#c44536",
+                          color: "#c44536",
+                          backgroundColor: "#fff5f3",
+                          padding: "6px 16px",
+                        }}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

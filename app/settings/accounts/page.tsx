@@ -183,7 +183,7 @@ function AccountSettingsInnerPage() {
   ) => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>{title}</h2>
-      <div style={{ overflowX: "auto" }}>
+      <div className="table-wrapper">
         <table className="table-basic" style={{ minWidth: "350px" }}>
           <thead>
             <tr>
@@ -240,7 +240,7 @@ function AccountSettingsInnerPage() {
   const renderCardTable = () => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>【カード】</h2>
-      <div style={{ overflowX: "auto" }}>
+      <div className="table-wrapper">
         <table className="table-basic" style={{ minWidth: "600px" }}>
           <thead>
             <tr>

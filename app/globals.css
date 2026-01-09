@@ -25,54 +25,84 @@ body {
 }
 
 /* 中央のコンテンツ領域 */
+/* 中央のコンテンツ領域 */
 .app-main {
   flex: 1;
   width: 100%;
+  /* 明示 */
   max-width: 760px;
   margin: 0 auto;
   padding: 20px 16px 40px;
+  /* 横スクロール原因の子要素をここで抑え込む（※sticky要素がある場合は注意） */
+  overflow-x: hidden;
+}
+
+/* ページ全体のコンテナ（横幅管理） */
+.page-container {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* 共通カード */
 .app-card {
-  margin-bottom: 16px;
-  padding: 16px;
-  border-radius: 10px;
-  background-color: #fbf7eb;
-  border: 1px solid #e0d5bf;
-  box-shadow: 0 2px 4px rgba(60, 40, 20, 0.04);
+  margin-bottom: 24px;
+  padding: 24px;
+  border-radius: 16px;
+  /* より丸く */
+  background-color: #fffaf5;
+  /* 少し明るく */
+  border: 1px solid rgba(230, 220, 210, 0.6);
+  box-shadow: 0 4px 20px rgba(93, 67, 48, 0.04), 0 1px 4px rgba(93, 67, 48, 0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* テーブルの基本スタイル（明細などで利用） */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* smooth scroll on iOS */
+  margin-bottom: 8px;
+  /* スクロールバーと下の要素の余白 */
+}
+
 .table-basic {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  white-space: nowrap;
+  /* モバイルで列が潰れないようにする */
 }
 
 .table-basic th,
 .table-basic td {
-  padding: 4px 6px;
-  border-bottom: 1px solid #e0d5bf;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee8dc;
 }
 
 .table-basic th {
-  background-color: rgba(255, 255, 255, 0.6);
-  font-weight: 500;
+  background-color: rgba(245, 240, 230, 0.5);
+  font-weight: 600;
+  text-align: left;
+  color: #8c7b6c;
+  font-size: 13px;
 }
 
 /* 小さめボタン風 */
 .btn-link {
   font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
   border: 1px solid #d0c2a8;
-  background-color: #fffaf0;
+  background-color: #fff;
   cursor: pointer;
+  transition: all 0.2s;
+  color: #5d4330;
 }
 
 .btn-link:hover {
   background-color: #f3e4c6;
+  border-color: #b58b5a;
 }
 
 /* a の初期スタイルを少し整える */
@@ -87,51 +117,103 @@ a:hover {
 }
 
 /* Responsive Utilities */
+.mobile-card-view {
+  display: none;
+}
+
+.desktop-table-view {
+  display: block;
+}
+
 @media (max-width: 768px) {
   .app-main {
-    padding: 16px 16px 80px;
-    /* Bottom padding for safety */
+    padding: 16px 16px 90px;
+    /* More bottom padding for mobile nav if needed */
   }
 
   .app-card {
-    padding: 16px;
-    margin-bottom: 24px;
+    padding: 20px;
+    margin-bottom: 20px;
     width: 100%;
     margin-left: 0;
     margin-right: 0;
+    border-radius: 12px;
+  }
+
+  /* カードリスト表示への切り替え */
+  .mobile-card-view {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .desktop-table-view {
+    display: none;
+  }
+
+  /* カードリストのアイテムスタイル */
+  .list-card-item {
+    background-color: #fff;
+    border: 1px solid #eee8dc;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  }
+
+  .list-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .list-card-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .list-card-label {
+    font-size: 12px;
+    color: #8c7b6c;
+  }
+
+  .list-card-value {
+    font-size: 15px;
+    font-weight: 500;
+    color: #3b2a1a;
   }
 }
 
 /* Form Utilities */
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .form-label {
   display: block;
   font-size: 14px;
-  margin-bottom: 6px;
-  font-weight: 500;
+  margin-bottom: 8px;
+  font-weight: 600;
   color: #5d4330;
 }
 
 .form-input,
 .form-select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-size: 16px;
   /* Prevents zoom on iOS */
-  border-radius: 6px;
-  border: 1px solid #ccb89b;
+  border-radius: 8px;
+  border: 1px solid #d4c8b5;
   background-color: #fff;
-  min-height: 44px;
-  /* Touch friendly */
+  min-height: 48px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-input:focus,
 .form-select:focus {
-  outline: 2px solid #b58b5a;
+  outline: none;
   border-color: #b58b5a;
+  box-shadow: 0 0 0 3px rgba(181, 139, 90, 0.1);
 }
 
 .form-radio-group {
@@ -153,24 +235,25 @@ a:hover {
 /* Button Utilities */
 .btn-primary {
   width: 100%;
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
   border: none;
-  background-color: #b58b5a;
+  background: linear-gradient(135deg, #b58b5a 0%, #9a7245 100%);
   color: #fff;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  min-height: 48px;
-  /* Touch friendly */
+  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.2s;
+  transition: transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(181, 139, 90, 0.3);
 }
 
 .btn-primary:active {
-  opacity: 0.8;
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(181, 139, 90, 0.2);
 }
 
 .btn-secondary {
@@ -180,11 +263,17 @@ a:hover {
   padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid #b58b5a;
-  background-color: #fff7ea;
+  background-color: #fff;
   font-size: 13px;
-  color: #5d4330;
+  color: #b58b5a;
   cursor: pointer;
   min-height: 40px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #fff7ea;
 }
 
 /* Header & Nav Utilities */
@@ -217,9 +306,12 @@ a:hover {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   font-size: 24px;
   color: #5d4330;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 768px) {
@@ -238,6 +330,7 @@ a:hover {
   height: calc(100vh - 50px);
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 998;
+  backdrop-filter: blur(4px);
 }
 
 .header-menu-content {
@@ -245,7 +338,9 @@ a:hover {
   border-bottom: 1px solid #c9c3b3;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 
 .logo-text-full {
@@ -270,7 +365,7 @@ a:hover {
 .grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 20px;
   align-items: start;
 }
 

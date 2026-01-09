@@ -406,7 +406,7 @@ export default function CategoryAndBudgetSettingsPage() {
             支出カテゴリがありません。「支出カテゴリ」の欄から追加してください。
           </p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-wrapper">
             <table className="table-basic">
               <thead>
                 <tr>

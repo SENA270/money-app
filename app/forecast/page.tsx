@@ -625,7 +625,7 @@ function ForecastContent() {
       {/* グラフ (スマホでは少し高さを確保) */}
       <div className="app-card" style={{ height: "300px", marginBottom: 24 }}>
         <h2>残高推移グラフ</h2>
-        <div style={{ position: "relative", height: "100%", maxHeight: "240px" }}>
+        <div style={{ position: "relative", width: "100%", height: "100%", maxHeight: "240px" }}>
           {rows.length > 0 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
@@ -641,47 +641,93 @@ function ForecastContent() {
         {rows.length === 0 ? (
           <p>データがありません。</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="table-basic" style={{ minWidth: "500px" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>日付</th>
-                  <th style={{ textAlign: "left" }}>内容</th>
-                  <th style={{ textAlign: "right" }}>金額</th>
-                  <th style={{ textAlign: "right" }}>残高</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const neg = r.balanceAfter < 0;
-                  return (
-                    <tr
-                      key={i}
-                      style={{
-                        backgroundColor: neg ? "#fbe3e3" : "inherit",
-                      }}
-                    >
-                      <td>{r.dateStr}</td>
-                      <td>{r.label}</td>
-                      <td style={{ textAlign: "right" }}>
-                        {r.amount < 0 ? "-" : "+"}
-                        ¥{Math.abs(r.amount).toLocaleString()}
-                      </td>
-                      <td
+          <>
+            {/* Desktop Table View */}
+            <div className="table-wrapper desktop-table-view">
+              <table className="table-basic" style={{ minWidth: "500px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>日付</th>
+                    <th style={{ textAlign: "left" }}>内容</th>
+                    <th style={{ textAlign: "right" }}>金額</th>
+                    <th style={{ textAlign: "right" }}>残高</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const neg = r.balanceAfter < 0;
+                    return (
+                      <tr
+                        key={i}
                         style={{
-                          textAlign: "right",
-                          fontWeight: neg ? "bold" : "normal",
-                          color: neg ? "#b3261e" : "inherit",
+                          backgroundColor: neg ? "#fbe3e3" : "inherit",
                         }}
                       >
+                        <td>{r.dateStr}</td>
+                        <td>{r.label}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {r.amount < 0 ? "-" : "+"}
+                          ¥{Math.abs(r.amount).toLocaleString()}
+                        </td>
+                        <td
+                          style={{
+                            textAlign: "right",
+                            fontWeight: neg ? "bold" : "normal",
+                            color: neg ? "#b3261e" : "inherit",
+                          }}
+                        >
+                          ¥{r.balanceAfter.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="mobile-card-view">
+              {rows.map((r, i) => {
+                const neg = r.balanceAfter < 0;
+                return (
+                  <div
+                    key={i}
+                    className="list-card-item"
+                    style={{
+                      backgroundColor: neg ? "#fff5f5" : "#fff",
+                      borderColor: neg ? "#ffcdd2" : "#eee8dc"
+                    }}
+                  >
+                    <div className="list-card-row">
+                      <span className="list-card-label">{r.dateStr}</span>
+                      <span
+                        className="list-card-value"
+                        style={{ fontSize: "14px", color: neg ? "#b3261e" : "#5d4330" }}
+                      >
+                        {r.label}
+                      </span>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-label">金額</span>
+                      <span className="list-card-value">
+                        {r.amount < 0 ? "-" : "+"}
+                        ¥{Math.abs(r.amount).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="list-card-row" style={{ marginTop: "4px", paddingTop: "4px", borderTop: "1px dashed #eee" }}>
+                      <span className="list-card-label">残高</span>
+                      <span
+                        className="list-card-value"
+                        style={{ fontWeight: "bold", color: neg ? "#b3261e" : "#3b2a1a" }}
+                      >
                         ¥{r.balanceAfter.toLocaleString()}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -696,49 +742,90 @@ function ForecastContent() {
         {bills.length === 0 ? (
           <p>対象期間の請求データがありません。</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="table-basic" style={{ minWidth: "500px" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>引き落とし日</th>
-                  <th style={{ textAlign: "left" }}>項目</th>
-                  <th style={{ textAlign: "right" }}>金額</th>
-                  <th style={{ textAlign: "center" }}>入金状況</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map((bill) => {
-                  const isPaid = paidBills[bill.id] ?? false;
-                  return (
-                    <tr key={bill.id}>
-                      <td>{bill.date}</td>
-                      <td>{bill.label}</td>
-                      <td style={{ textAlign: "right" }}>
-                        ¥{bill.amount.toLocaleString()}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          type="button"
-                          onClick={() => togglePaid(bill.id)}
-                          className={`btn-secondary`}
-                          style={{
-                            fontSize: "12px",
-                            padding: "4px 10px",
-                            minHeight: "auto",
-                            backgroundColor: isPaid ? "#edf7ec" : "#fff5f3",
-                            color: isPaid ? "#2f7d32" : "#c44536",
-                            borderColor: isPaid ? "#4f8f3a" : "#c44536"
-                          }}
-                        >
-                          {isPaid ? "入金済み" : "未入金"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Desktop Table View */}
+            <div className="table-wrapper desktop-table-view">
+              <table className="table-basic" style={{ minWidth: "500px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>引き落とし日</th>
+                    <th style={{ textAlign: "left" }}>項目</th>
+                    <th style={{ textAlign: "right" }}>金額</th>
+                    <th style={{ textAlign: "center" }}>入金状況</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bills.map((bill) => {
+                    const isPaid = paidBills[bill.id] ?? false;
+                    return (
+                      <tr key={bill.id}>
+                        <td>{bill.date}</td>
+                        <td>{bill.label}</td>
+                        <td style={{ textAlign: "right" }}>
+                          ¥{bill.amount.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => togglePaid(bill.id)}
+                            className={`btn-secondary`}
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 10px",
+                              minHeight: "auto",
+                              backgroundColor: isPaid ? "#edf7ec" : "#fff5f3",
+                              color: isPaid ? "#2f7d32" : "#c44536",
+                              borderColor: isPaid ? "#4f8f3a" : "#c44536"
+                            }}
+                          >
+                            {isPaid ? "入金済み" : "未入金"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="mobile-card-view">
+              {bills.map((bill) => {
+                const isPaid = paidBills[bill.id] ?? false;
+                return (
+                  <div key={bill.id} className="list-card-item">
+                    <div className="list-card-row">
+                      <span className="list-card-label">{bill.date}</span>
+                      <button
+                        type="button"
+                        onClick={() => togglePaid(bill.id)}
+                        className={`btn-secondary`}
+                        style={{
+                          fontSize: "11px",
+                          padding: "2px 8px",
+                          minHeight: "24px",
+                          backgroundColor: isPaid ? "#edf7ec" : "#fff5f3",
+                          color: isPaid ? "#2f7d32" : "#c44536",
+                          borderColor: isPaid ? "#4f8f3a" : "#c44536"
+                        }}
+                      >
+                        {isPaid ? "入金済み" : "未入金"}
+                      </button>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-value" style={{ fontSize: "15px" }}>
+                        {bill.label}
+                      </span>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-label">金額</span>
+                      <span className="list-card-value">¥{bill.amount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

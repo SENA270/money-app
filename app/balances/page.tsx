@@ -426,26 +426,47 @@ function BalancesContent() {
           {bankRows.length === 0 ? (
             <p>銀行口座が登録されていません。</p>
           ) : (
-            <table className="table-basic">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>名称</th>
-                  <th style={{ textAlign: "right" }}>
-                    残高（円）
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Desktop Table View */}
+              <div className="table-wrapper desktop-table-view">
+                <table className="table-basic">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left" }}>名称</th>
+                      <th style={{ textAlign: "right" }}>
+                        残高（円）
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankRows.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.name}</td>
+                        <td style={{ textAlign: "right" }}>
+                          ¥{r.balance.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="mobile-card-view">
                 {bankRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td style={{ textAlign: "right" }}>
-                      ¥{r.balance.toLocaleString()}
-                    </td>
-                  </tr>
+                  <div key={r.id} className="list-card-item">
+                    <div className="list-card-row">
+                      <span className="list-card-label">名称</span>
+                      <span className="list-card-value">{r.name}</span>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-label">残高</span>
+                      <span className="list-card-value">¥{r.balance.toLocaleString()}</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
@@ -455,26 +476,45 @@ function BalancesContent() {
           {walletRows.length === 0 ? (
             <p>財布が登録されていません。</p>
           ) : (
-            <table className="table-basic">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>名称</th>
-                  <th style={{ textAlign: "right" }}>
-                    残高（円）
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <div className="table-wrapper desktop-table-view">
+                <table className="table-basic">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left" }}>名称</th>
+                      <th style={{ textAlign: "right" }}>
+                        残高（円）
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {walletRows.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.name}</td>
+                        <td style={{ textAlign: "right" }}>
+                          ¥{r.balance.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mobile-card-view">
                 {walletRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td style={{ textAlign: "right" }}>
-                      ¥{r.balance.toLocaleString()}
-                    </td>
-                  </tr>
+                  <div key={r.id} className="list-card-item">
+                    <div className="list-card-row">
+                      <span className="list-card-label">名称</span>
+                      <span className="list-card-value">{r.name}</span>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-label">残高</span>
+                      <span className="list-card-value">¥{r.balance.toLocaleString()}</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
@@ -484,26 +524,45 @@ function BalancesContent() {
           {qrRows.length === 0 ? (
             <p>QR残高が登録されていません。</p>
           ) : (
-            <table className="table-basic">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>名称</th>
-                  <th style={{ textAlign: "right" }}>
-                    残高（円）
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <div className="table-wrapper desktop-table-view">
+                <table className="table-basic">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left" }}>名称</th>
+                      <th style={{ textAlign: "right" }}>
+                        残高（円）
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qrRows.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.name}</td>
+                        <td style={{ textAlign: "right" }}>
+                          ¥{r.balance.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mobile-card-view">
                 {qrRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td style={{ textAlign: "right" }}>
-                      ¥{r.balance.toLocaleString()}
-                    </td>
-                  </tr>
+                  <div key={r.id} className="list-card-item">
+                    <div className="list-card-row">
+                      <span className="list-card-label">名称</span>
+                      <span className="list-card-value">{r.name}</span>
+                    </div>
+                    <div className="list-card-row">
+                      <span className="list-card-label">残高</span>
+                      <span className="list-card-value">¥{r.balance.toLocaleString()}</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       </div>

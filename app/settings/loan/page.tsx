@@ -169,108 +169,220 @@ export default function LoanSettingsPage() {
         )}
 
         {/* テーブル形式に変更してスクロール対応 */}
-        <div style={{ overflowX: "auto" }}>
-          <table className="table-basic" style={{ minWidth: "900px" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>名称</th>
-                <th style={{ textAlign: "right", width: "120px" }}>1回あたり</th>
-                <th style={{ textAlign: "center", width: "140px" }}>開始日</th>
-                <th style={{ textAlign: "right", width: "80px" }}>支払日</th>
-                <th style={{ textAlign: "center", width: "100px" }}>頻度</th>
-                <th style={{ textAlign: "right", width: "80px" }}>回数</th>
-                <th style={{ textAlign: "right", width: "120px" }}>総額(自動)</th>
-                <th style={{ textAlign: "center", width: "80px" }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const total = item.amountPerPayment * item.numberOfPayments;
-                return (
-                  <tr key={item.id}>
-                    <td>
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) => handleChange(item.id, "name", e.target.value)}
-                        className="form-input"
-                        placeholder="奨学金Aなど"
-                      />
-                    </td>
-                    <td>
+        {/* テーブル形式に変更してスクロール対応 */}
+        <>
+          {/* Desktop Table View */}
+          <div className="table-wrapper desktop-table-view">
+            <table className="table-basic" style={{ minWidth: "900px" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>名称</th>
+                  <th style={{ textAlign: "right", width: "120px" }}>1回あたり</th>
+                  <th style={{ textAlign: "center", width: "140px" }}>開始日</th>
+                  <th style={{ textAlign: "right", width: "80px" }}>支払日</th>
+                  <th style={{ textAlign: "center", width: "100px" }}>頻度</th>
+                  <th style={{ textAlign: "right", width: "80px" }}>回数</th>
+                  <th style={{ textAlign: "right", width: "120px" }}>総額(自動)</th>
+                  <th style={{ textAlign: "center", width: "80px" }}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const total = item.amountPerPayment * item.numberOfPayments;
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleChange(item.id, "name", e.target.value)}
+                          className="form-input"
+                          placeholder="奨学金Aなど"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          value={item.amountPerPayment || ""}
+                          onChange={(e) => handleChange(item.id, "amountPerPayment", e.target.value)}
+                          className="form-input"
+                          style={{ textAlign: "right" }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={item.startDate}
+                          onChange={(e) => handleChange(item.id, "startDate", e.target.value)}
+                          className="form-input"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={1} max={31}
+                          value={item.paymentDay || ""}
+                          onChange={(e) => handleChange(item.id, "paymentDay", e.target.value)}
+                          className="form-input"
+                          style={{ textAlign: "right" }}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={item.frequency}
+                          onChange={(e) => handleChange(item.id, "frequency", e.target.value)}
+                          className="form-select"
+                        >
+                          <option value="monthly">毎月</option>
+                          <option value="half-year">半年ごと</option>
+                          <option value="yearly">年1回</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={1} max={999}
+                          value={item.numberOfPayments || ""}
+                          onChange={(e) => handleChange(item.id, "numberOfPayments", e.target.value)}
+                          className="form-input"
+                          style={{ textAlign: "right" }}
+                        />
+                      </td>
+                      <td style={{ textAlign: "right", fontSize: 13 }}>
+                        ¥{total.toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id)}
+                          className="btn-secondary"
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            minHeight: "auto",
+                            backgroundColor: "#fff5f3",
+                            color: "#c44536",
+                            borderColor: "#c44536",
+                          }}
+                        >
+                          削除
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="mobile-card-view">
+            {items.map((item) => {
+              const total = item.amountPerPayment * item.numberOfPayments;
+              return (
+                <div key={item.id} className="list-card-item">
+                  <div className="list-card-row">
+                    <span className="list-card-label" style={{ width: "60px" }}>名称</span>
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => handleChange(item.id, "name", e.target.value)}
+                      className="form-input"
+                      placeholder="奨学金Aなど"
+                      style={{ flex: 1, padding: "8px" }}
+                    />
+                  </div>
+
+                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>1回あたり(円)</span>
                       <input
                         type="number"
                         value={item.amountPerPayment || ""}
                         onChange={(e) => handleChange(item.id, "amountPerPayment", e.target.value)}
                         className="form-input"
-                        style={{ textAlign: "right" }}
+                        style={{ textAlign: "right", padding: "8px" }}
                       />
-                    </td>
-                    <td>
+                    </div>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>頻度</span>
+                      <select
+                        value={item.frequency}
+                        onChange={(e) => handleChange(item.id, "frequency", e.target.value)}
+                        className="form-select"
+                        style={{ padding: "8px" }}
+                      >
+                        <option value="monthly">毎月</option>
+                        <option value="half-year">6ヶ月ごと</option>
+                        <option value="yearly">年1回</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>開始日</span>
                       <input
                         type="date"
                         value={item.startDate}
                         onChange={(e) => handleChange(item.id, "startDate", e.target.value)}
                         className="form-input"
+                        style={{ padding: "8px" }}
                       />
-                    </td>
-                    <td>
+                    </div>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>支払日(1-31)</span>
                       <input
                         type="number"
                         min={1} max={31}
                         value={item.paymentDay || ""}
                         onChange={(e) => handleChange(item.id, "paymentDay", e.target.value)}
                         className="form-input"
-                        style={{ textAlign: "right" }}
+                        style={{ textAlign: "right", padding: "8px" }}
                       />
-                    </td>
-                    <td>
-                      <select
-                        value={item.frequency}
-                        onChange={(e) => handleChange(item.id, "frequency", e.target.value)}
-                        className="form-select"
-                      >
-                        <option value="monthly">毎月</option>
-                        <option value="half-year">半年ごと</option>
-                        <option value="yearly">年1回</option>
-                      </select>
-                    </td>
-                    <td>
+                    </div>
+                  </div>
+
+                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>回数</span>
                       <input
                         type="number"
                         min={1} max={999}
                         value={item.numberOfPayments || ""}
                         onChange={(e) => handleChange(item.id, "numberOfPayments", e.target.value)}
                         className="form-input"
-                        style={{ textAlign: "right" }}
+                        style={{ textAlign: "right", padding: "8px" }}
                       />
-                    </td>
-                    <td style={{ textAlign: "right", fontSize: 13 }}>
-                      ¥{total.toLocaleString()}
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="btn-secondary"
-                        style={{
-                          padding: "4px 10px",
-                          fontSize: "12px",
-                          minHeight: "auto",
-                          backgroundColor: "#fff5f3",
-                          color: "#c44536",
-                          borderColor: "#c44536",
-                        }}
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <div>
+                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>総額(自動)</span>
+                      <div style={{ padding: "8px", textAlign: "right", fontWeight: "bold" }}>
+                        ¥{total.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16, textAlign: "right", paddingTop: 12, borderTop: "1px dashed #eee" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.id)}
+                      className="btn-secondary"
+                      style={{
+                        padding: "6px 16px",
+                        backgroundColor: "#fff5f3",
+                        color: "#c44536",
+                        borderColor: "#c44536",
+                      }}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
 
         {/* 合計表示・ボタン */}
         <div style={{ marginTop: 24 }}>
