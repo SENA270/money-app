@@ -183,7 +183,8 @@ function AccountSettingsInnerPage() {
   ) => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>{title}</h2>
-      <div className="table-wrapper">
+      {/* Desktop Table */}
+      <div className="table-wrapper desktop-table-view">
         <table className="table-basic" style={{ minWidth: "350px" }}>
           <thead>
             <tr>
@@ -226,6 +227,40 @@ function AccountSettingsInnerPage() {
         </table>
       </div>
 
+      {/* Mobile Card View */}
+      <div className="mobile-card-view">
+        {rows.map((a) => (
+          <div key={a.id} className="list-card-item">
+            <div className="list-card-row">
+              <span className="list-card-label" style={{ width: "40px" }}>名称</span>
+              <input
+                type="text"
+                value={a.name}
+                onChange={handleNameChange(type, a.id)}
+                className="form-input"
+                placeholder="名称を入力"
+                style={{ flex: 1, padding: "8px" }}
+              />
+            </div>
+            <div style={{ marginTop: 12, textAlign: "right", paddingTop: 8, borderTop: "1px dashed #eee" }}>
+              <button
+                type="button"
+                onClick={() => handleRemoveRow(type, a.id)}
+                className="btn-secondary"
+                style={{
+                  padding: "6px 16px",
+                  backgroundColor: "#fff5f3",
+                  color: "#c44536",
+                  borderColor: "#c44536",
+                }}
+              >
+                削除
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <button
         type="button"
         onClick={() => handleAddRow(type)}
@@ -240,7 +275,8 @@ function AccountSettingsInnerPage() {
   const renderCardTable = () => (
     <div className="app-card" style={{ marginBottom: 16 }}>
       <h2>【カード】</h2>
-      <div className="table-wrapper">
+      {/* Desktop Table */}
+      <div className="table-wrapper desktop-table-view">
         <table className="table-basic" style={{ minWidth: "600px" }}>
           <thead>
             <tr>
@@ -316,6 +352,79 @@ function AccountSettingsInnerPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="mobile-card-view">
+        {cardAccounts.map((a) => (
+          <div key={a.id} className="list-card-item">
+            <div className="list-card-row">
+              <span className="list-card-label" style={{ width: "40px" }}>名称</span>
+              <input
+                type="text"
+                value={a.name}
+                onChange={handleNameChange("card", a.id)}
+                className="form-input"
+                placeholder="カード名称"
+                style={{ flex: 1, padding: "8px" }}
+              />
+            </div>
+            <div className="list-card-row" style={{ marginTop: 8 }}>
+              <span className="list-card-label" style={{ width: "65px" }}>内訳キー</span>
+              <input
+                type="text"
+                value={a.paymentKey ?? ""}
+                onChange={handleCardPaymentKeyChange(a.id)}
+                className="form-input"
+                placeholder="例：セゾンカード"
+                style={{ flex: 1, padding: "8px", fontSize: "13px" }}
+              />
+            </div>
+
+            <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+              <div>
+                <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>締め日</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={a.closingDay ?? ""}
+                  onChange={handleCardNumberChange(a.id, "closingDay")}
+                  className="form-input"
+                  style={{ textAlign: "right", padding: "8px" }}
+                />
+              </div>
+              <div>
+                <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>支払い日</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={a.paymentDay ?? ""}
+                  onChange={handleCardNumberChange(a.id, "paymentDay")}
+                  className="form-input"
+                  style={{ textAlign: "right", padding: "8px" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, textAlign: "right", paddingTop: 8, borderTop: "1px dashed #eee" }}>
+              <button
+                type="button"
+                onClick={() => handleRemoveRow("card", a.id)}
+                className="btn-secondary"
+                style={{
+                  padding: "6px 16px",
+                  backgroundColor: "#fff5f3",
+                  color: "#c44536",
+                  borderColor: "#c44536",
+                }}
+              >
+                削除
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <button

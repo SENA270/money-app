@@ -30,11 +30,19 @@ body {
   flex: 1;
   width: 100%;
   /* 明示 */
-  max-width: 760px;
+  /* 明示 */
+  max-width: 1024px;
   margin: 0 auto;
-  padding: 20px 16px 40px;
+  padding: 24px 24px 60px;
   /* 横スクロール原因の子要素をここで抑え込む（※sticky要素がある場合は注意） */
   overflow-x: hidden;
+}
+
+@media (max-width: 1040px) {
+  .app-main {
+    max-width: 100%;
+    padding: 20px 16px 40px;
+  }
 }
 
 /* ページ全体のコンテナ（横幅管理） */
@@ -142,13 +150,13 @@ a:hover {
 
   /* カードリスト表示への切り替え */
   .mobile-card-view {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     gap: 12px;
   }
 
   .desktop-table-view {
-    display: none;
+    display: none !important;
   }
 
   /* カードリストのアイテムスタイル */
@@ -312,6 +320,12 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (min-width: 769px) {
+  .header-hamburger-btn.mobile-only {
+    display: none !important;
+  }
 }
 
 @media (max-width: 768px) {

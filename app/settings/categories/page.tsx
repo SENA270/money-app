@@ -406,34 +406,59 @@ export default function CategoryAndBudgetSettingsPage() {
             支出カテゴリがありません。「支出カテゴリ」の欄から追加してください。
           </p>
         ) : (
-          <div className="table-wrapper">
-            <table className="table-basic">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>カテゴリ</th>
-                  <th style={{ textAlign: "right", width: "160px" }}>予算（円）</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenseCategories.map((cat) => (
-                  <tr key={cat.id}>
-                    <td>{cat.name}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <input
-                        type="number"
-                        value={getBudget(targetMonth, cat.id) || ""}
-                        onChange={(e) =>
-                          handleBudgetChange(cat.id, e.target.value)
-                        }
-                        className="form-input"
-                        style={{ width: "100%", textAlign: "right" }}
-                      />
-                    </td>
+          <>
+            <div className="table-wrapper desktop-table-view">
+              <table className="table-basic">
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>カテゴリ</th>
+                    <th style={{ textAlign: "right", width: "160px" }}>予算（円）</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {expenseCategories.map((cat) => (
+                    <tr key={cat.id}>
+                      <td>{cat.name}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <input
+                          type="number"
+                          value={getBudget(targetMonth, cat.id) || ""}
+                          onChange={(e) =>
+                            handleBudgetChange(cat.id, e.target.value)
+                          }
+                          className="form-input"
+                          style={{ width: "100%", textAlign: "right" }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mobile-card-view">
+              {expenseCategories.map((cat) => (
+                <div key={cat.id} className="list-card-item">
+                  <div className="list-card-row">
+                    <span className="list-card-label">カテゴリ</span>
+                    <span className="list-card-value">{cat.name}</span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span className="list-card-label" style={{ display: "block", marginBottom: 4 }}>予算(円)</span>
+                    <input
+                      type="number"
+                      value={getBudget(targetMonth, cat.id) || ""}
+                      onChange={(e) =>
+                        handleBudgetChange(cat.id, e.target.value)
+                      }
+                      className="form-input"
+                      style={{ width: "100%", textAlign: "right", padding: "8px" }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 

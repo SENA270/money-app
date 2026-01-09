@@ -76,7 +76,7 @@ export default function Header() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            maxWidth: "760px",
+            maxWidth: "1024px",
             margin: "0 auto",
             height: "54px", // Fixed height for alignment
           }}

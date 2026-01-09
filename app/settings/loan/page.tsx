@@ -293,7 +293,7 @@ export default function LoanSettingsPage() {
                     />
                   </div>
 
-                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
                     <div>
                       <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>1回あたり(円)</span>
                       <input
@@ -319,7 +319,7 @@ export default function LoanSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
                     <div>
                       <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>開始日</span>
                       <input
@@ -343,7 +343,7 @@ export default function LoanSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
                     <div>
                       <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>回数</span>
                       <input
