@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { AuthGuard } from "./AuthGuard";
 import Header from "./Header";
 import Footer from "./Footer";
+import BottomNav from "./BottomNav";
+import SwipeNav from "./SwipeNav";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,8 +24,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : (
         <AuthGuard>
           <Header />
-          <main className="app-main">{children}</main>
+          <SwipeNav>
+            <main className="app-main">{children}</main>
+          </SwipeNav>
           <Footer />
+          {pathname !== "/receipt" && <BottomNav />}
         </AuthGuard>
       )}
     </body>

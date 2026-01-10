@@ -1,31 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Doughnut } from "react-chartjs-2";
+import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
+import { useForecast } from "./hooks/useForecast";
 
 type Totals = {
   [key: string]: number;
 };
 
-function getRemainingDaysForMonth(
-  viewYear: number,
-  viewMonth: number
-): number | null {
+function getRemainingDaysForMonth(): number {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth() + 1;
-
-  if (y !== viewYear || m !== viewMonth) return null;
-
   const lastDay = new Date(y, m, 0).getDate();
   const currentDay = today.getDate();
   return lastDay - currentDay;
@@ -33,524 +20,195 @@ function getRemainingDaysForMonth(
 
 export default function Home() {
   const today = new Date();
-  const [viewYear, setViewYear] = useState<number>(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState<number>(today.getMonth() + 1);
+  const viewYear = today.getFullYear();
+  const viewMonth = today.getMonth() + 1;
+  const displayMonthLabel = `${viewYear}年${viewMonth}月`;
 
   const [monthlyExpense, setMonthlyExpense] = useState(0);
   const [monthlyBudgetTotal, setMonthlyBudgetTotal] = useState(0);
-
   const [categorySpent, setCategorySpent] = useState<Totals>({});
   const [categoryBudget, setCategoryBudget] = useState<Totals>({});
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const displayMonthLabel = `${viewYear}年${viewMonth}月`;
+  // Forecast Hook for "Next Payment"
+  const { nextPaymentEvent, startBalance, loading: forecastLoading } = useForecast(3);
 
-  const handlePrevMonth = () => {
-    setViewMonth((prev) => {
-      if (prev === 1) {
-        setViewYear((y) => y - 1);
-        return 12;
-      }
-      return prev - 1;
-    });
-  };
-
-  const handleNextMonth = () => {
-    setViewMonth((prev) => {
-      if (prev === 12) {
-        setViewYear((y) => y + 1);
-        return 1;
-      }
-      return prev + 1;
-    });
-  };
-
-  const rawRemainingTotal = monthlyBudgetTotal - monthlyExpense;
-  const isOverAll = rawRemainingTotal < 0;
-  const hasBudget = monthlyBudgetTotal > 0;
-  const remainingForChart = Math.max(rawRemainingTotal, 0);
-  const overForChart = Math.max(-rawRemainingTotal, 0);
-
-  const doughnutData = hasBudget
-    ? rawRemainingTotal >= 0
-      ? {
-          labels: ["残り予算", "使った金額"],
-          datasets: [
-            {
-              data: [remainingForChart, monthlyExpense],
-              backgroundColor: ["#f2b591", "#e8ddc7"],
-              borderColor: "#f9f4ea",
-              borderWidth: 2,
-            },
-          ],
-        }
-      : {
-          labels: ["残り予算", "使った金額（予算内）", "予算オーバー分"],
-          datasets: [
-            {
-              data: [0, monthlyBudgetTotal, overForChart],
-              backgroundColor: ["#f2b591", "#e8ddc7", "#c44536"],
-              borderColor: "#f9f4ea",
-              borderWidth: 2,
-            },
-          ],
-        }
-    : {
-        labels: ["データなし"],
-        datasets: [
-          {
-            data: [1],
-            backgroundColor: ["#e0d6c4"],
-          },
-        ],
-      };
-
-  const doughnutOptions: any = {
-    plugins: {
-      legend: {
-        position: "bottom" as const,
-        labels: { color: "#3b2a1a" },
-      },
-    },
-  };
-
-  const categoryRows = Object.keys(categoryBudget).map((name) => {
-    const budget = categoryBudget[name] || 0;
-    const spent = categorySpent[name] || 0;
-    const remaining = budget - spent;
-
-    const ratio =
-      budget > 0 && remaining > 0
-        ? Math.max(0, Math.min(1, remaining / budget))
-        : 0;
-
-    return {
-      name,
-      budget,
-      spent,
-      remaining,
-      ratio,
-    };
-  });
-
-  categoryRows.sort((a, b) => a.remaining - b.remaining);
-
-  const totalRemainingPositive = categoryRows
-    .filter((r) => r.remaining > 0)
-    .reduce((sum, r) => sum + r.remaining, 0);
-
-  const totalDeficit = Math.max(-rawRemainingTotal, 0);
-  const stillShort = Math.max(totalDeficit - totalRemainingPositive, 0);
-
-  const remainingDays = getRemainingDaysForMonth(viewYear, viewMonth);
-  const perDayBudget =
-    remainingDays !== null && remainingDays > 0
-      ? Math.floor(rawRemainingTotal / remainingDays)
-      : null;
-
+  // Load Budget & Expenses
   useEffect(() => {
-    const loadBudgets = async () => {
-      console.log("loadBudgets start", { viewYear, viewMonth });
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      const userRes = await supabase.auth.getUser();
-      const user = userRes.data.user;
-      if (!user) {
-        console.log("loadBudgets: no user");
-        return;
-      }
-
-      setCurrentUserId(user.id);
-
-      const { data, error } = await supabase
+      // 1. Budget (Category Sum fallback for MVP)
+      const { data: bData } = await supabase
         .from("category_budgets")
         .select("category, amount")
         .eq("user_id", user.id)
         .eq("year", viewYear)
         .eq("month", viewMonth);
 
-      console.log("loadBudgets query result", { data, error });
-
-      if (error) {
-        console.error("カテゴリ別予算の読み込みに失敗しました", error);
-        return;
-      }
-
       const budgetMap: Totals = {};
-      let total = 0;
-
-      (data || []).forEach((item) => {
-        if (!item.category) return;
+      let totalB = 0;
+      (bData || []).forEach((item: any) => {
         const amt = Number(item.amount) || 0;
         budgetMap[item.category] = amt;
-        total += amt;
+        totalB += amt;
       });
-
-      console.log("loadBudgets parsed budgets", { budgetMap, total });
-
       setCategoryBudget(budgetMap);
-      setMonthlyBudgetTotal(total);
-    };
+      setMonthlyBudgetTotal(totalB);
 
-    loadBudgets();
-  }, [viewYear, viewMonth]);
-
-  useEffect(() => {
-    const load = async () => {
-      const userRes = await supabase.auth.getUser();
-      const user = userRes.data.user;
-      if (!user) return;
-
+      // 2. Expenses (This Month)
       const start = new Date(viewYear, viewMonth - 1, 1);
       const end = new Date(viewYear, viewMonth, 1);
 
-      const { data, error } = await supabase
+      const { data: txData } = await supabase
         .from("transactions")
         .select("*")
         .eq("user_id", user.id)
         .gte("date", start.toISOString())
-        .lt("date", end.toISOString());
+        .lt("date", end.toISOString())
+        .eq("type", "expense"); // Only expenses
 
-      if (error) {
-        console.error("Supabase load error", error);
-        return;
-      }
-
-      let totalExpense = 0;
-      const perCategory: Totals = {};
-
-      data.forEach((t) => {
-        if (t.type !== "expense") return;
-
-        totalExpense += t.amount;
-
-        const key = t.category || "その他";
-        if (!perCategory[key]) perCategory[key] = 0;
-        perCategory[key] += t.amount;
+      let totalE = 0;
+      const spentMap: Totals = {};
+      (txData || []).forEach((t: any) => {
+        totalE += t.amount;
+        const cat = t.category || "その他";
+        spentMap[cat] = (spentMap[cat] || 0) + t.amount;
       });
-
-      setMonthlyExpense(totalExpense);
-      setCategorySpent(perCategory);
+      setMonthlyExpense(totalE);
+      setCategorySpent(spentMap);
     };
-
     load();
   }, [viewYear, viewMonth]);
 
+  // Derived Metrics
+  const remaining = monthlyBudgetTotal - monthlyExpense;
+  const remainingDays = getRemainingDaysForMonth();
+  const dailyLimit = remainingDays > 0 ? Math.floor(Math.max(0, remaining) / remainingDays) : 0;
+  const percentUsed = monthlyBudgetTotal > 0 ? (monthlyExpense / monthlyBudgetTotal) * 100 : 0;
+
+  // Identify Risk Categories (>80%)
+  const riskCategories = Object.keys(categoryBudget).map(name => {
+    const b = categoryBudget[name];
+    const s = categorySpent[name] || 0;
+    const p = b > 0 ? (s / b) * 100 : 0;
+    return { name, p, s, b };
+  }).filter(c => c.p >= 80).sort((a, b) => b.p - a.p).slice(0, 3);
+
   return (
-    <div className="page-container">
-      <h1>ホーム</h1>
-      {currentUserId && (
-        <p style={{ fontSize: 12, color: "#555", marginTop: -4 }}>
-          ログイン中ユーザーID: {currentUserId}
+    <div className="page-container" style={{ paddingBottom: 100 }}>
+      <header style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, color: "#5d4330" }}>{displayMonthLabel}の状況</h1>
+        <p style={{ fontSize: 13, color: "#9e8b78" }}>
+          直感的な判断のためのサマリー
         </p>
+      </header>
+
+      {/* 1. Main Judgment Card */}
+      <div className="app-card" style={{ background: remaining < 0 ? "#fff5f3" : "#fff", border: remaining < 0 ? "1px solid #e57373" : undefined }}>
+        <h2 style={{ fontSize: 14, color: "#7a6a55", marginBottom: 8 }}>今月使える残り</h2>
+
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 32, fontWeight: 700, color: remaining < 0 ? "#c44536" : "#2f7d32" }}>
+            ¥{remaining.toLocaleString()}
+          </span>
+          <span style={{ fontSize: 14, color: "#9e8b78" }}>
+            / 予算 ¥{monthlyBudgetTotal.toLocaleString()}
+          </span>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ height: 8, background: "#f0ece4", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              width: `${Math.min(100, percentUsed)}%`,
+              background: remaining < 0 ? "#c44536" : "#b58b5a",
+              transition: "width 0.5s"
+            }} />
+          </div>
+          <p style={{ textAlign: "right", fontSize: 12, marginTop: 4, color: "#7a6a55" }}>
+            利用額: ¥{monthlyExpense.toLocaleString()} ({Math.round(percentUsed)}%)
+          </p>
+        </div>
+      </div>
+
+      {/* 2. Daily Allowance */}
+      <div className="grid-container" style={{ marginTop: 16 }}>
+        <div className="app-card" style={{ marginBottom: 0 }}>
+          <h2 style={{ fontSize: 13, color: "#7a6a55" }}>残り{remainingDays}日</h2>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ fontSize: 12, color: "#9e8b78" }}>1日あたり</span>
+            <div style={{ fontSize: 20, fontWeight: 600, color: "#5d4330" }}>
+              ¥{dailyLimit.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Next Payment (from Forecast) */}
+        <div className="app-card" style={{ marginBottom: 0 }}>
+          <h2 style={{ fontSize: 13, color: "#7a6a55" }}>次の支払い</h2>
+          {forecastLoading ? (
+            <p style={{ fontSize: 12 }}>計算中...</p>
+          ) : nextPaymentEvent ? (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: "#c44536", fontWeight: 600 }}>
+                {nextPaymentEvent.label}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  ¥{Math.abs(nextPaymentEvent.amount).toLocaleString()}
+                </span>
+                <span style={{ fontSize: 11, color: "#9e8b78" }}>
+                  {nextPaymentEvent.dateStr.slice(5)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p style={{ fontSize: 12, color: "#9e8b78", marginTop: 4 }}>予定なし</p>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Risk Categories */}
+      {riskCategories.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: 14, color: "#c44536", marginBottom: 8, display: "flex", alignItems: "center" }}>
+            ⚠️ 使いすぎ注意カテゴリ
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {riskCategories.map(c => (
+              <div key={c.name} className="app-card" style={{ padding: "12px 16px", marginBottom: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
+                  <span style={{ color: "#c44536", fontWeight: 700, fontSize: 14 }}>{Math.round(c.p)}%</span>
+                </div>
+                <div style={{ height: 4, background: "#fff5f3", borderRadius: 2 }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, c.p)}%`, background: "#c44536" }} />
+                </div>
+                <div style={{ textAlign: "right", fontSize: 11, marginTop: 4, color: "#7a6a55" }}>
+                  残 ¥{(c.b - c.s).toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
-      <p style={{ marginBottom: "12px" }}>
-        月ごとの予算と実績をざっくり確認できるページです。
-      </p>
 
-      {/* 月送り */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 16,
-          fontSize: 14,
-        }}
-      >
-        <button
-          type="button"
-          onClick={handlePrevMonth}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid #c1a97e",
-            background: "#fef9ed",
-            cursor: "pointer",
-          }}
-        >
-          ← 前の月
-        </button>
-        <span>表示中: {displayMonthLabel}</span>
-        <button
-          type="button"
-          onClick={handleNextMonth}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid #c1a97e",
-            background: "#fef9ed",
-            cursor: "pointer",
-          }}
-        >
-          次の月 →
-        </button>
+      {/* 5. Forecast Link */}
+      <div style={{ marginTop: 24 }}>
+        <Link href="/forecast" className="app-card" style={{ display: "block", textDecoration: "none", background: "#fbf7eb", border: "1px solid #e0d6c8" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ fontSize: 14, color: "#5d4330", margin: 0 }}>資金繰り予測を見る</h3>
+              <p style={{ fontSize: 11, color: "#9e8b78", margin: "4px 0 0" }}>
+                現在資産: ¥{startBalance.toLocaleString()}
+              </p>
+            </div>
+            <span style={{ fontSize: 20, color: "#b58b5a" }}>→</span>
+          </div>
+        </Link>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "16px",
-          alignItems: "flex-start",
-        }}
-      >
-        {/* 左：サマリー */}
-        <div
-          className="app-card"
-          style={{ flex: "2 1 320px", minWidth: "280px" }}
-        >
-          <h2>{displayMonthLabel}のサマリー</h2>
-
-          {hasBudget ? (
-            <>
-              {/* 今月の残りを少し強調 */}
-              <div
-                style={{
-                  marginTop: 4,
-                  marginBottom: 8,
-                  fontSize: 14,
-                }}
-              >
-                今月使える残り：
-                <strong
-                  style={{
-                    fontSize: 18,
-                    color: isOverAll ? "#c44536" : "#3b2a1a",
-                    marginLeft: 4,
-                  }}
-                >
-                  ¥{Math.abs(rawRemainingTotal).toLocaleString()}
-                </strong>
-              </div>
-
-              <div
-                style={{
-                  position: "relative",
-                  maxWidth: "360px",
-                  margin: "0 auto",
-                }}
-              >
-                <Doughnut data={doughnutData} options={doughnutOptions} />
-
-                {/* 真ん中の表示 */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    textAlign: "center",
-                    pointerEvents: "none",
-                    color: "#3b2a1a",
-                  }}
-                >
-                  <div style={{ fontSize: "13px", marginBottom: 2 }}>
-                    {isOverAll ? "オーバー" : "残り"}
-                  </div>
-                  <div style={{ fontSize: "18px", fontWeight: 700 }}>
-                    ¥{Math.abs(rawRemainingTotal).toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: "11px", marginTop: 2 }}>
-                    / 予算 ¥{monthlyBudgetTotal.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: "12px", fontSize: "14px" }}>
-                <p>
-                  予算：
-                  <strong>¥{monthlyBudgetTotal.toLocaleString()}</strong>
-                </p>
-                <p>
-                  使った金額：
-                  <strong>¥{monthlyExpense.toLocaleString()}</strong>
-                </p>
-                {remainingDays !== null ? (
-                  <>
-                    <p>
-                      残り日数：<strong>{remainingDays}</strong>日
-                    </p>
-                    <p>
-                      1日あたり使える金額：
-                      <strong>
-                        ¥{(perDayBudget ?? 0).toLocaleString()}
-                      </strong>
-                    </p>
-                  </>
-                ) : (
-                  <p style={{ color: "#555", marginTop: 4 }}>
-                    ※ 今月以外を表示中のため、残り日数と1日あたりの目安は表示していません。
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <p style={{ marginTop: "8px" }}>
-              この月の予算がまだ設定されていません。
-              <br />
-              「設定 &gt; カテゴリ別予算」から予算を登録してください。
-            </p>
-          )}
-        </div>
-
-        {/* 右：カテゴリ別 */}
-        <div
-          className="app-card"
-          style={{ flex: "1 1 260px", minWidth: "260px" }}
-        >
-          <h2>カテゴリ別 残り予算</h2>
-
-          {!hasBudget ? (
-            <p>カテゴリ別の予算がまだ登録されていません。</p>
-          ) : categoryRows.length === 0 ? (
-            <p>この月のカテゴリ別予算は設定されていますが、明細がありません。</p>
-          ) : (
-            <>
-              {/* 全体状況の説明 */}
-              {isOverAll ? (
-                <div
-                  style={{
-                    fontSize: "13px",
-                    marginBottom: 8,
-                    color: "#c44536",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  全体で
-                  <strong>
-                    ¥{totalDeficit.toLocaleString()}
-                  </strong>
-                  オーバーしています。
-                  <br />
-                  他カテゴリの残り合計は
-                  <strong>
-                    ¥{totalRemainingPositive.toLocaleString()}
-                  </strong>
-                  です。
-                  {stillShort > 0 ? (
-                    <>
-                      <br />
-                      すべて調整しても
-                      <strong>
-                        ¥{stillShort.toLocaleString()}
-                      </strong>
-                      足りない見込みです。
-                    </>
-                  ) : (
-                    <>
-                      <br />
-                      他カテゴリを調整すれば、まだ挽回できる余地があります。
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: "13px",
-                    marginBottom: 8,
-                    color: "#555",
-                  }}
-                >
-                  全体としてはまだ予算内です。
-                </div>
-              )}
-
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                {categoryRows.map((row) => {
-                  const isRowOver = row.remaining < 0;
-                  const fillWidth = isRowOver
-                    ? "100%"
-                    : `${row.ratio * 100}%`;
-
-                  const barColor = isRowOver
-                    ? "#c44536"
-                    : isOverAll && row.remaining > 0
-                    ? "#e09f3e"
-                    : "#4f8f3a";
-
-                  // メッセージ：オーバー時だけ表示
-                  let message = "";
-                  if (isRowOver) {
-                    message = "予算オーバーです。他のカテゴリで調整しましょう。";
-                  }
-
-                  return (
-                    <div key={row.name}>
-                      {/* 1行目：カテゴリ名 + 金額 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "13px",
-                          marginBottom: 4,
-                        }}
-                      >
-                        <span>{row.name}</span>
-                        <span
-                          style={{
-                            color: isRowOver ? "#c44536" : "#3b2a1a",
-                          }}
-                        >
-                          {isRowOver ? (
-                            <>
-                              予算オーバー：
-                              ¥{Math.abs(row.remaining).toLocaleString()} / 予算：
-                              ¥{row.budget.toLocaleString()}
-                            </>
-                          ) : (
-                            <>
-                              残り：
-                              ¥{row.remaining.toLocaleString()} / 予算：
-                              ¥{row.budget.toLocaleString()}
-                            </>
-                          )}
-                        </span>
-                      </div>
-
-                      {/* 2行目：オーバー時だけ注意文 */}
-                      {message && (
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            marginBottom: 4,
-                            color: "#c44536",
-                          }}
-                        >
-                          {message}
-                        </div>
-                      )}
-
-                      {/* 棒グラフ */}
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "8px",
-                          borderRadius: "999px",
-                          backgroundColor: "#e6ddcf",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: fillWidth,
-                            height: "100%",
-                            borderRadius: "999px",
-                            backgroundColor: barColor,
-                            transition: "width 0.3s",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-      {/* フッターのリンク（明細・シミュレーション） は削除 */}
     </div>
   );
 }

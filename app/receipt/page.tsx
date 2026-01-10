@@ -188,25 +188,42 @@ function ReceiptInnerPage() {
           fontSize: 14,
         }}
       >
-        レシート画像をアップすると、AI がざっくり「合計金額」「日付」「ざっくりカテゴリ」を読み取ります。
-        「読み取る」ボタンを押すと、自動で入力画面に反映されます。
-        内容がおかしい場合は、入力画面側で自由に修正してください。
+        レシート画像をアップロードしてください。
+        <br />
+        <span style={{ fontSize: 12, color: "#9e8b78" }}>
+          ※ SP版ではカメラが起動します。PC版では画像ファイルを選択してください。
+        </span>
       </p>
 
       <form onSubmit={handleSubmit} style={{ marginBottom: "16px" }}>
-        <div style={{ marginBottom: "12px" }}>
-          <input type="file" accept="image/*" onChange={handleFileChange} />
+        <div style={{ marginBottom: "16px", padding: "20px", border: "2px dashed #d0c2a8", borderRadius: "8px", textAlign: "center", backgroundColor: "#fffcf5" }}>
+          {/* Mobile: Camera preferred, Desktop: File Picker */}
+          <input
+            type="file"
+            accept="image/*;capture=camera"
+            onChange={handleFileChange}
+            style={{ display: "none" }}
+            id="receipt-file-input"
+          />
+          <label htmlFor="receipt-file-input" style={{ display: "block", cursor: "pointer", padding: "10px" }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📷</div>
+            <div style={{ fontSize: 14, color: "#5d4330", fontWeight: 600 }}>
+              {file ? file.name : "写真を撮る / ファイルを選択"}
+            </div>
+          </label>
         </div>
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !file}
+          className="btn-primary" // Use global class
           style={{
-            padding: "6px 16px",
-            borderRadius: 4,
+            width: "100%",
+            borderRadius: 8,
             border: "none",
-            backgroundColor: "#5d4330",
+            backgroundColor: loading || !file ? "#d0c2a8" : "#5d4330",
             color: "#fff",
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: loading || !file ? "not-allowed" : "pointer",
           }}
         >
           {loading ? "読み取り中..." : "読み取って入力画面に反映"}
@@ -234,43 +251,43 @@ function ReceiptInnerPage() {
         result.paymentMethod !== null ||
         result.category !== null ||
         result.rawText) && (
-        <section
-          style={{
-            padding: "10px 12px",
-            borderRadius: 4,
-            border: "1px solid #e0c8b0",
-            backgroundColor: "#fffaf4",
-            whiteSpace: "pre-wrap",
-            fontSize: 13,
-          }}
-        >
-          <h2
+          <section
             style={{
-              fontSize: "15px",
-              fontWeight: 600,
-              marginBottom: "6px",
+              padding: "10px 12px",
+              borderRadius: 4,
+              border: "1px solid #e0c8b0",
+              backgroundColor: "#fffaf4",
+              whiteSpace: "pre-wrap",
+              fontSize: 13,
             }}
           >
-            読み取り結果（参考）
-          </h2>
-          <p>合計金額: {result.totalAmount ?? "不明"}</p>
-          <p>日付: {result.date ?? "不明"}</p>
-          <p>支払方法（生データ）: {result.paymentMethod ?? "不明"}</p>
-          <p>推定カテゴリ: {result.category ?? "不明"}</p>
-
-          <div style={{ marginTop: "6px" }}>
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>生テキスト</div>
-            <div
+            <h2
               style={{
-                fontFamily: "monospace",
-                fontSize: 11,
+                fontSize: "15px",
+                fontWeight: 600,
+                marginBottom: "6px",
               }}
             >
-              {result.rawText || "(テキストなし)"}
+              読み取り結果（参考）
+            </h2>
+            <p>合計金額: {result.totalAmount ?? "不明"}</p>
+            <p>日付: {result.date ?? "不明"}</p>
+            <p>支払方法（生データ）: {result.paymentMethod ?? "不明"}</p>
+            <p>推定カテゴリ: {result.category ?? "不明"}</p>
+
+            <div style={{ marginTop: "6px" }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>生テキスト</div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                }}
+              >
+                {result.rawText || "(テキストなし)"}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
     </main>
   );
 }

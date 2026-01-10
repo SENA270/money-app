@@ -133,9 +133,23 @@ function InputInnerPage() {
     }
   }, []);
 
+  // Handle Query Params (type, mode)
+  useEffect(() => {
+    const typeParam = searchParams.get("type");
+    if (typeParam === "expense" || typeParam === "income") {
+      setType(typeParam);
+    }
+
+    const modeParam = searchParams.get("mode");
+    if (modeParam === "scan") {
+      setShowReceiptModal(true);
+    }
+  }, [searchParams]);
+
   // ③ 種別が変わったときのカテゴリ初期値
   useEffect(() => {
     if (isEditMode && category) return;
+    // ... (rest of the logic)
 
     if (type === "expense") {
       if (expenseCategories.length > 0) {
@@ -368,13 +382,13 @@ function InputInnerPage() {
 
     alert("保存しました。");
 
-    if (id) {
-      router.push("/history");
-      return;
-    }
+    alert("保存しました。");
 
-    setAmount("");
-    setMemo("");
+    if (id) {
+      router.push("/history"); // Edit mode -> back to history
+    } else {
+      router.push("/"); // New entry -> back to home (MVP Speed)
+    }
   };
 
   const currentCategoryOptions =
@@ -390,127 +404,141 @@ function InputInnerPage() {
         カード払いは、カード設定で登録した「内訳キー」で管理されます。
       </p>
 
-      {/* レシートから読み取るボタン */}
-      <div style={{ marginBottom: 16 }}>
-        <button
-          type="button"
-          onClick={() => setShowReceiptModal(true)}
-          className="btn-secondary"
-        >
-          📷 レシートから読み取る
-        </button>
-      </div>
+
 
       <form
         onSubmit={handleSubmit}
         className="app-card"
-        style={{ maxWidth: 480 }}
+        style={{ maxWidth: 480, margin: "0 auto" }}
       >
-        {/* 日付 */}
-        <div className="form-group">
-          <label className="form-label">日付</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="form-input"
-          />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, margin: 0, color: "#5d4330" }}>内容を入力</h2>
+          <button
+            type="button"
+            onClick={() => setShowReceiptModal(true)}
+            className="btn-link"
+            style={{ display: "flex", alignItems: "center", gap: 4, height: 32 }}
+          >
+            📷 レシート読取
+          </button>
         </div>
 
-        {/* 種別 */}
-        <div className="form-group">
-          <label className="form-label">種別</label>
-          <div className="form-radio-group">
-            <label className="form-radio-label">
-              <input
-                type="radio"
-                value="expense"
-                checked={type === "expense"}
-                onChange={() => setType("expense")}
-              />{" "}
-              支出
-            </label>
-            <label className="form-radio-label">
-              <input
-                type="radio"
-                value="income"
-                checked={type === "income"}
-                onChange={() => setType("income")}
-              />{" "}
-              収入
-            </label>
+        <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          {/* 日付 */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>日付</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="form-input"
+              style={{ padding: "8px" }}
+            />
+          </div>
+
+          {/* 種別 */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>種別</label>
+            <div className="form-radio-group" style={{ minHeight: 38 }}>
+              <label className="form-radio-label">
+                <input
+                  type="radio"
+                  value="expense"
+                  checked={type === "expense"}
+                  onChange={() => setType("expense")}
+                />{" "}
+                支出
+              </label>
+              <label className="form-radio-label">
+                <input
+                  type="radio"
+                  value="income"
+                  checked={type === "income"}
+                  onChange={() => setType("income")}
+                />{" "}
+                収入
+              </label>
+            </div>
           </div>
         </div>
 
-        {/* 金額 */}
-        <div className="form-group">
-          <label className="form-label">金額（円）</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="form-input"
-            style={{ textAlign: "right" }}
-          />
+        <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          {/* 金額 */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>金額</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="form-input"
+              style={{ textAlign: "right", padding: "8px" }}
+              placeholder="0"
+            />
+          </div>
+
+          {/* カテゴリ */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>カテゴリ</label>
+            {hasCategory ? (
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="form-select"
+                style={{ padding: "8px" }}
+              >
+                {currentCategoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p style={{ fontSize: 11, color: "#b3261e", marginTop: 4 }}>
+                カテゴリ未設定
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* カテゴリ */}
-        <div className="form-group">
-          <label className="form-label">カテゴリ</label>
-          {hasCategory ? (
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="form-select"
-            >
-              {currentCategoryOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p style={{ fontSize: 13, color: "#b3261e" }}>
-              カテゴリが未設定です。「設定 &gt; カテゴリ」から登録してください。
-            </p>
-          )}
+        <div className="grid-container" style={{ gridTemplateColumns: "1fr 1.5fr", gap: 16, marginBottom: 20 }}>
+          {/* 支払い方法 */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>支払い</label>
+            {paymentOptions.length > 0 ? (
+              <select
+                value={payment}
+                onChange={(e) => setPayment(e.target.value)}
+                className="form-select"
+                style={{ padding: "8px" }}
+              >
+                {paymentOptions.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p style={{ fontSize: 11, color: "#b3261e", marginTop: 4 }}>
+                口座未設定
+              </p>
+            )}
+          </div>
+
+          {/* メモ */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ fontSize: 12 }}>メモ</label>
+            <input
+              type="text"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="任意"
+              className="form-input"
+              style={{ padding: "8px" }}
+            />
+          </div>
         </div>
 
-        {/* 支払い方法 */}
-        <div className="form-group">
-          <label className="form-label">支払い方法</label>
-          {paymentOptions.length > 0 ? (
-            <select
-              value={payment}
-              onChange={(e) => setPayment(e.target.value)}
-              className="form-select"
-            >
-              {paymentOptions.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p style={{ fontSize: 13, color: "#b3261e" }}>
-              口座や財布が未登録です。「設定 &gt; 残高設定」から登録してください。
-            </p>
-          )}
-        </div>
-
-        {/* メモ */}
-        <div className="form-group" style={{ marginBottom: 24 }}>
-          <label className="form-label">メモ（任意）</label>
-          <input
-            type="text"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="例：コンビニ、サブスクなど"
-            className="form-input"
-          />
-        </div>
-
-        <button type="submit" className="btn-primary">
+        <button type="submit" className="btn-primary" style={{ minHeight: 44, fontSize: 15 }}>
           保存する
         </button>
       </form>
