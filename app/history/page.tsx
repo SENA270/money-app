@@ -5,7 +5,51 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 
-type TransactionType = "expense" | "income";
+type TransactionType = "expense" | "income" | "card_payment";
+
+// ...
+
+// Helper for type label and color
+function getTypeLabel(type: TransactionType) {
+  if (type === "income") return "収入";
+  if (type === "card_payment") return "振替";
+  return "支出";
+}
+
+function getTypeColor(type: TransactionType) {
+  if (type === "income") return "#2f7d32";
+  if (type === "card_payment") return "#555"; // Gray for transfer
+  return "#c44536";
+}
+
+function getTypeBg(type: TransactionType) {
+  if (type === "income") return "#edf7ec";
+  if (type === "card_payment") return "#f5f5f5";
+  return "#fff5f3";
+}
+
+function getTypeBorder(type: TransactionType) {
+  if (type === "income") return "#4f8f3a";
+  if (type === "card_payment") return "#999";
+  return "#c44536";
+}
+
+// ... inside HistoryContent ...
+
+// In Table View:
+// <td>{getTypeLabel(t.type)}</td>
+// <td style={{ color: getTypeColor(t.type), fontWeight: 600 }}>
+//   {t.type === "expense" ? "-" : t.type === "card_payment" ? "-> " : "+"}
+//   ¥{t.amount.toLocaleString()}
+// </td>
+
+// In Mobile Card View:
+// <span style={{ backgroundColor: getTypeBg(t.type), color: getTypeColor(t.type), borderColor: getTypeBorder(t.type) ... }}>
+//   {getTypeLabel(t.type)}
+// </span>
+// <span style={{ color: getTypeColor(t.type) ... }}>
+//   ¥{t.amount.toLocaleString()}
+// </span>
 
 type Transaction = {
   id: string;
@@ -234,16 +278,16 @@ function HistoryContent() {
                   {visibleTransactions.map((t) => (
                     <tr key={t.id}>
                       <td>{formatDate(t.date)}</td>
-                      <td>{t.type === "income" ? "収入" : "支出"}</td>
+                      <td>{t.type === "income" ? "収入" : t.type === "card_payment" ? "振替" : "支出"}</td>
                       <td>{t.category}</td>
                       <td
                         style={{
                           textAlign: "right",
-                          color: t.type === "expense" ? "#c44536" : "#2f7d32",
+                          color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32",
                           fontWeight: 600,
                         }}
                       >
-                        {t.type === "expense" ? "-" : "+"}
+                        {t.type === "expense" ? "-" : t.type === "card_payment" ? "→" : "+"}
                         ¥{t.amount.toLocaleString()}
                       </td>
                       <td>{t.payment}</td>
@@ -292,13 +336,13 @@ function HistoryContent() {
                         fontSize: "12px",
                         padding: "2px 8px",
                         borderRadius: "4px",
-                        backgroundColor: t.type === "expense" ? "#fff5f3" : "#edf7ec",
-                        color: t.type === "expense" ? "#c44536" : "#2f7d32",
+                        backgroundColor: t.type === "expense" ? "#fff5f3" : t.type === "card_payment" ? "#f5f5f5" : "#edf7ec",
+                        color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32",
                         border: "1px solid",
-                        borderColor: t.type === "expense" ? "#c44536" : "#4f8f3a"
+                        borderColor: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#ccc" : "#4f8f3a"
                       }}
                     >
-                      {t.type === "income" ? "収入" : "支出"}
+                      {t.type === "income" ? "収入" : t.type === "card_payment" ? "振替" : "支出"}
                     </span>
                   </div>
                   <div className="list-card-row">
@@ -308,7 +352,7 @@ function HistoryContent() {
                       style={{
                         fontSize: "16px",
                         fontWeight: 600,
-                        color: t.type === "expense" ? "#c44536" : "#2f7d32"
+                        color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32"
                       }}
                     >
                       ¥{t.amount.toLocaleString()}

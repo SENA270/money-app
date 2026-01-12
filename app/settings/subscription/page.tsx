@@ -16,24 +16,27 @@ type Subscription = {
   id: string;
   name: string;
   amount: number;
-  billingDay: number; // 1-31
-  // 今後の自動入力で使う想定
+  frequency: "monthly" | "yearly";
+  nextPaymentDate: string; // YYYY-MM-DD
   paymentSourceType: "account" | "card";
-  paymentSourceId: string; // Account.id
+  paymentSourceId: string;
 };
 
 type AppSettings = {
   subscriptions?: Subscription[];
-  // 他にも saving / loans など入っているかもしれないので
-  // ここでは触らずにマージだけする
 };
 
 function createEmptySubscription(): Subscription {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return {
     id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: "",
     amount: 0,
-    billingDay: 1,
+    frequency: "monthly",
+    nextPaymentDate: `${y}-${m}-${day}`,
     paymentSourceType: "account",
     paymentSourceId: "",
   };
@@ -47,14 +50,14 @@ export default function SubscriptionSettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 1) 口座・カードの一覧（/settings/accounts で保存したもの）
+    // 1) 口座・カード
     const accountsRaw = localStorage.getItem("accounts");
     if (accountsRaw) {
       try {
         const parsed = JSON.parse(accountsRaw) as Account[];
         setAccounts(parsed);
       } catch (e) {
-        console.error("accounts の読み込みに失敗しました", e);
+        console.error("accounts read error", e);
       }
     }
 
@@ -64,22 +67,40 @@ export default function SubscriptionSettingsPage() {
       try {
         const parsed = JSON.parse(settingsRaw) as AppSettings;
         const list = parsed.subscriptions ?? [];
-        if (list.length > 0) {
-          setSubscriptions(list);
+        // Migration check: if data has billingDay but no nextPaymentDate
+        const migrated = list.map((s: any) => {
+          if (s.nextPaymentDate) return s;
+          // Migrate legacy
+          const d = new Date();
+          const day = s.billingDay || s.paymentDay || 1;
+          const m = d.getDate() > day ? d.getMonth() + 2 : d.getMonth() + 1; // next month if passed
+          const y = d.getFullYear();
+          const nd = new Date(y, m - 1, day);
+          const yyyy = nd.getFullYear();
+          const mm = String(nd.getMonth() + 1).padStart(2, "0");
+          const dd = String(nd.getDate()).padStart(2, "0");
+
+          return {
+            ...s,
+            frequency: s.frequency || "monthly",
+            nextPaymentDate: `${yyyy}-${mm}-${dd}`
+          };
+        });
+
+        if (migrated.length > 0) {
+          setSubscriptions(migrated);
         } else {
           setSubscriptions([createEmptySubscription()]);
         }
       } catch (e) {
-        console.error("subscriptions の読み込みに失敗しました", e);
+        console.error("subscriptions read error", e);
         setSubscriptions([createEmptySubscription()]);
       }
     } else {
-      // 何もなければ1行だけ出す
       setSubscriptions([createEmptySubscription()]);
     }
   }, []);
 
-  // 口座系・カード系の選択肢
   const accountOptions = accounts.filter(
     (a) => a.type === "bank" || a.type === "wallet" || a.type === "qr"
   );
@@ -93,35 +114,18 @@ export default function SubscriptionSettingsPage() {
         if (field === "amount") {
           value = Number(value || 0);
         }
-        if (field === "billingDay") {
-          let v = Number(value || 1);
-          if (v < 1) v = 1;
-          if (v > 31) v = 31;
-          value = v;
-        }
-        if (field === "paymentSourceType") {
-          // 種類を切り替えたら、とりあえず paymentSourceId は空にする
-          value = value as "account" | "card";
-        }
 
         setSubscriptions((prev) =>
           prev.map((s) => {
             if (s.id !== id) return s;
             const updated: Subscription = { ...s, [field]: value };
-
-            // 種類を切り替えたときは支払い元IDを消す
-            if (field === "paymentSourceType") {
-              updated.paymentSourceId = "";
-            }
-
+            if (field === "paymentSourceType") updated.paymentSourceId = "";
             return updated;
           })
         );
       };
 
-  const handleAddRow = () => {
-    setSubscriptions((prev) => [...prev, createEmptySubscription()]);
-  };
+  const handleAddRow = () => setSubscriptions((prev) => [...prev, createEmptySubscription()]);
 
   const handleRemoveRow = (id: string) => {
     setSubscriptions((prev) => {
@@ -131,66 +135,43 @@ export default function SubscriptionSettingsPage() {
   };
 
   const handleSave = () => {
-    if (typeof window === "undefined") return;
-
-    // 空行を落とす（名前も金額も 0 のもの）
-    const cleaned = subscriptions.filter(
-      (s) => s.name.trim() !== "" || s.amount !== 0
-    );
-
+    const cleaned = subscriptions.filter(s => s.name.trim() !== "" || s.amount !== 0);
     try {
       const settingsRaw = localStorage.getItem("settings");
-      const settings: AppSettings =
-        settingsRaw ? (JSON.parse(settingsRaw) as AppSettings) : {};
-
-      const newSettings: AppSettings = {
-        ...settings,
-        subscriptions: cleaned,
-      };
-
+      const settings: AppSettings = settingsRaw ? JSON.parse(settingsRaw) : {};
+      const newSettings: AppSettings = { ...settings, subscriptions: cleaned };
       localStorage.setItem("settings", JSON.stringify(newSettings));
       alert("サブスク設定を保存しました！");
     } catch (e) {
-      console.error("サブスク設定の保存に失敗しました", e);
-      alert("保存に失敗しました…（コンソールを確認してみてください）");
+      alert("保存に失敗しました");
     }
   };
 
   return (
     <div className="page-container">
-      <h1>サブスク設定</h1>
+      <h1>サブスク・固定費設定</h1>
       <p style={{ marginBottom: 16, fontSize: 14 }}>
-        毎月発生するサブスク（固定費）を登録します。
+        毎月または毎年の固定費を登録します。
         <br />
-        支払い元には「銀行口座・財布・QR」に加えて「クレジットカード」も選べます。
+        次回支払日を設定すると、資金繰り予測に反映されます。
       </p>
 
       <div className="app-card">
         {subscriptions.length === 0 ? (
-          <p>まだサブスクが登録されていません。</p>
+          <p>まだ登録されていません。</p>
         ) : (
           <>
             {/* Desktop Table View */}
             <div className="table-wrapper desktop-table-view">
-              <table className="table-basic" style={{ minWidth: "800px" }}>
+              <table className="table-basic" style={{ minWidth: "900px" }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", padding: "4px 6px" }}>名称</th>
-                    <th style={{ textAlign: "right", padding: "4px 6px" }}>
-                      月額（円）
-                    </th>
-                    <th style={{ textAlign: "center", padding: "4px 6px", width: "80px" }}>
-                      引き落とし日
-                    </th>
-                    <th style={{ textAlign: "center", padding: "4px 6px" }}>
-                      支払い元の種類
-                    </th>
-                    <th style={{ textAlign: "center", padding: "4px 6px" }}>
-                      支払い元
-                    </th>
-                    <th style={{ textAlign: "center", padding: "4px 6px", width: "80px" }}>
-                      操作
-                    </th>
+                    <th style={{ textAlign: "right", padding: "4px 6px" }}>金額(円)</th>
+                    <th style={{ textAlign: "center", padding: "4px 6px", width: "100px" }}>頻度</th>
+                    <th style={{ textAlign: "center", padding: "4px 6px", width: "140px" }}>次回支払日</th>
+                    <th style={{ textAlign: "center", padding: "4px 6px" }}>支払元</th>
+                    <th style={{ textAlign: "center", padding: "4px 6px", width: "60px" }}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -200,18 +181,15 @@ export default function SubscriptionSettingsPage() {
 
                     return (
                       <tr key={s.id}>
-                        {/* 名称 */}
                         <td style={{ padding: "4px 6px" }}>
                           <input
                             type="text"
                             value={s.name}
                             onChange={handleChange(s.id, "name")}
                             className="form-input"
-                            placeholder="Netflixなど"
+                            placeholder="Netflix / 年会費など"
                           />
                         </td>
-
-                        {/* 月額 */}
                         <td style={{ padding: "4px 6px", textAlign: "right" }}>
                           <input
                             type="number"
@@ -221,74 +199,56 @@ export default function SubscriptionSettingsPage() {
                             style={{ textAlign: "right" }}
                           />
                         </td>
-
-                        {/* 引き落とし日 */}
                         <td style={{ padding: "4px 6px" }}>
-                          <input
-                            type="number"
-                            min={1}
-                            max={31}
-                            value={s.billingDay}
-                            onChange={handleChange(s.id, "billingDay")}
-                            className="form-input"
-                            style={{ textAlign: "right" }}
-                          />
-                        </td>
-
-                        {/* 支払い元の種類 */}
-                        <td style={{ padding: "4px 6px", textAlign: "center" }}>
                           <select
-                            value={s.paymentSourceType}
-                            onChange={handleChange(s.id, "paymentSourceType")}
+                            value={s.frequency}
+                            onChange={handleChange(s.id, "frequency")}
                             className="form-select"
                           >
-                            <option value="account">口座・財布・QR</option>
-                            <option value="card">クレジットカード</option>
+                            <option value="monthly">毎月</option>
+                            <option value="yearly">毎年</option>
                           </select>
                         </td>
-
-                        {/* 支払い元ID（実際の口座 or カード） */}
-                        <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                          {options.length === 0 ? (
-                            <span style={{ fontSize: 12, color: "#b3261e" }}>
-                              {isAccount
-                                ? "未登録"
-                                : "未登録"}
-                            </span>
-                          ) : (
+                        <td style={{ padding: "4px 6px" }}>
+                          <input
+                            type="date"
+                            value={s.nextPaymentDate}
+                            onChange={handleChange(s.id, "nextPaymentDate")}
+                            className="form-input"
+                          />
+                        </td>
+                        <td style={{ padding: "4px 6px" }}>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <select
+                              value={s.paymentSourceType}
+                              onChange={handleChange(s.id, "paymentSourceType")}
+                              className="form-select"
+                              style={{ width: "80px" }}
+                            >
+                              <option value="account">口座</option>
+                              <option value="card">カード</option>
+                            </select>
                             <select
                               value={s.paymentSourceId}
                               onChange={handleChange(s.id, "paymentSourceId")}
                               className="form-select"
-                              style={{ minWidth: "160px" }}
+                              style={{ flex: 1 }}
                             >
-                              <option value="">選択してください</option>
-                              {options.map((a) => (
-                                <option key={a.id} value={a.id}>
-                                  {a.type === "card"
-                                    ? `【カード】${a.name}`
-                                    : `【${a.type === "bank"
-                                      ? "銀行"
-                                      : a.type === "wallet"
-                                        ? "財布"
-                                        : "QR"
-                                    }】${a.name}`}
-                                </option>
+                              <option value="">選択</option>
+                              {options.map(a => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
                               ))}
                             </select>
-                          )}
+                          </div>
                         </td>
-
-                        {/* 削除ボタン */}
                         <td style={{ padding: "4px 6px", textAlign: "center" }}>
                           <button
                             type="button"
                             onClick={() => handleRemoveRow(s.id)}
                             className="btn-secondary"
                             style={{
-                              padding: "4px 10px",
+                              padding: "4px 8px",
                               fontSize: "12px",
-                              minHeight: "auto",
                               backgroundColor: "#fff5f3",
                               color: "#c44536",
                               borderColor: "#c44536",
@@ -319,13 +279,12 @@ export default function SubscriptionSettingsPage() {
                         value={s.name}
                         onChange={handleChange(s.id, "name")}
                         className="form-input"
-                        placeholder="Netflixなど"
+                        placeholder="名称"
                         style={{ flex: 1, padding: "8px" }}
                       />
                     </div>
-
                     <div className="list-card-row" style={{ marginTop: 8 }}>
-                      <span className="list-card-label" style={{ width: "60px" }}>月額(円)</span>
+                      <span className="list-card-label" style={{ width: "60px" }}>金額</span>
                       <input
                         type="number"
                         value={s.amount === 0 ? "" : s.amount}
@@ -335,57 +294,54 @@ export default function SubscriptionSettingsPage() {
                       />
                     </div>
 
-                    <div className="list-card-row" style={{ marginTop: 8 }}>
-                      <span className="list-card-label" style={{ width: "100px" }}>引き落とし日</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={s.billingDay}
-                        onChange={handleChange(s.id, "billingDay")}
-                        className="form-input"
-                        style={{ width: "80px", padding: "8px", textAlign: "right" }}
-                      />
+                    <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                      <div>
+                        <span className="list-card-label">頻度</span>
+                        <select
+                          value={s.frequency}
+                          onChange={handleChange(s.id, "frequency")}
+                          className="form-select"
+                          style={{ marginTop: 4 }}
+                        >
+                          <option value="monthly">毎月</option>
+                          <option value="yearly">毎年</option>
+                        </select>
+                      </div>
+                      <div>
+                        <span className="list-card-label">次回支払日</span>
+                        <input
+                          type="date"
+                          value={s.nextPaymentDate}
+                          onChange={handleChange(s.id, "nextPaymentDate")}
+                          className="form-input"
+                          style={{ marginTop: 4, padding: "8px" }}
+                        />
+                      </div>
                     </div>
 
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed #eee" }}>
-                      <div className="list-card-row">
-                        <span className="list-card-label">支払い元の種類</span>
+                    <div style={{ marginTop: 12 }}>
+                      <span className="list-card-label">支払元</span>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                         <select
                           value={s.paymentSourceType}
                           onChange={handleChange(s.id, "paymentSourceType")}
                           className="form-select"
-                          style={{ padding: "8px", maxWidth: "200px" }}
+                          style={{ width: "90px" }}
                         >
-                          <option value="account">口座・財布・QR</option>
-                          <option value="card">クレジットカード</option>
+                          <option value="account">口座</option>
+                          <option value="card">カード</option>
                         </select>
-                      </div>
-                      <div className="list-card-row" style={{ marginTop: 8 }}>
-                        <span className="list-card-label">支払い元</span>
-                        {options.length === 0 ? (
-                          <span style={{ fontSize: 12, color: "#b3261e" }}>
-                            {isAccount
-                              ? "未登録（口座一覧へ）"
-                              : "未登録（カード一覧へ）"}
-                          </span>
-                        ) : (
-                          <select
-                            value={s.paymentSourceId}
-                            onChange={handleChange(s.id, "paymentSourceId")}
-                            className="form-select"
-                            style={{ padding: "8px", maxWidth: "200px" }}
-                          >
-                            <option value="">選択してください</option>
-                            {options.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.type === "card"
-                                  ? `【カード】${a.name}`
-                                  : `${a.name}`}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        <select
+                          value={s.paymentSourceId}
+                          onChange={handleChange(s.id, "paymentSourceId")}
+                          className="form-select"
+                          style={{ flex: 1 }}
+                        >
+                          <option value="">選択</option>
+                          {options.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
@@ -409,30 +365,13 @@ export default function SubscriptionSettingsPage() {
               })}
             </div>
           </>
-        )
-        }
+        )}
 
-        <div style={{ marginTop: 24, paddingBottom: 16 }}>
-          <div style={{ display: "flex", gap: 16 }}>
-            <button
-              type="button"
-              onClick={handleAddRow}
-              className="btn-secondary"
-            >
-              ＋ 行を追加
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="btn-primary"
-              style={{ width: "100%", maxWidth: "200px" }}
-            >
-              すべて保存する
-            </button>
-          </div>
+        <div style={{ marginTop: 24, paddingBottom: 16, display: "flex", gap: 16 }}>
+          <button onClick={handleAddRow} className="btn-secondary">＋ 追加</button>
+          <button onClick={handleSave} className="btn-primary" style={{ flex: 1 }}>設定を保存</button>
         </div>
       </div>
-
       <div style={{ marginTop: 16, fontSize: 14 }}>
         <Link href="/settings">← 設定トップへ戻る</Link>
       </div>

@@ -70,6 +70,16 @@ export default function SettingsTopPage() {
             </Link>
           </div>
         </div>
+
+        <div className="app-card">
+          <h2>データ管理</h2>
+          <p>取引CSVのエクスポートや、設定のバックアップ・復元。</p>
+          <div style={{ marginTop: 16 }}>
+            <Link href="/settings/export" className="btn-secondary">
+              開く
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

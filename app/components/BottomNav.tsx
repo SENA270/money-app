@@ -51,7 +51,7 @@ export default function BottomNav() {
       // ここでは /input にパラメータ付きで飛ばす
       router.push("/input?mode=scan");
     } else {
-      router.push(`/input?type=${mode}`);
+      router.push(`/input?mode=${mode}`);
     }
   };
 

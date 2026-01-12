@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 // --- Types ---
+// --- Types ---
+
 export type Transaction = {
   id: string;
   date: string;
   amount: number;
-  type: "expense" | "income";
+  type: "expense" | "income" | "card_payment";
   category: string;
   payment: string;
   memo?: string;
@@ -36,8 +38,10 @@ export type Subscription = {
   id: string;
   name: string;
   amount: number;
-  paymentDay: number;
+  paymentDay?: number; // Made optional as legacy fallback
   startDate?: string;
+  frequency?: "monthly" | "yearly"; // New
+  nextPaymentDate?: string; // New
 };
 
 export type ForecastEvent = {
@@ -54,6 +58,7 @@ export type ForecastResult = {
   startBalance: number;
   balanceHistory: { dateStr: string; balance: number }[];
   nextPaymentEvent: ForecastEvent | null;
+  upcomingPayments: ForecastEvent[];
   loading: boolean;
 };
 
@@ -77,6 +82,7 @@ export function useForecast(monthsToForecast: number = 6) {
     startBalance: 0,
     balanceHistory: [],
     nextPaymentEvent: null,
+    upcomingPayments: [],
     loading: true,
   });
 
@@ -128,7 +134,7 @@ export function useForecast(monthsToForecast: number = 6) {
         const isAssetPayment = assetAccounts.some(a => a.name === t.payment);
 
         if (isAssetPayment) {
-          if (t.type === "expense") currentAssetBalance -= t.amount;
+          if (t.type === "expense" || t.type === "card_payment") currentAssetBalance -= t.amount;
           else if (t.type === "income") currentAssetBalance += t.amount;
         }
       });
@@ -172,21 +178,40 @@ export function useForecast(monthsToForecast: number = 6) {
         const amount = Number(sub.amount);
         if (!amount) return;
 
-        // Find next payment date
-        let date = new Date(start.getFullYear(), start.getMonth(), sub.paymentDay);
-        if (date < start) date = addMonths(date, 1);
+        // Determine start date
+        let date: Date;
+        if (sub.nextPaymentDate) {
+          date = new Date(sub.nextPaymentDate);
+        } else if (sub.paymentDay) {
+          // Fallback for legacy data
+          date = new Date(start.getFullYear(), start.getMonth(), sub.paymentDay);
+          if (date < start) date = addMonths(date, 1);
+        } else {
+          // No date info? Skip or default to 1st? Skip is safer.
+          return;
+        }
 
         while (date <= end) {
           const dStr = formatDate(date);
-          events.push({
-            id: `sub_${sub.id}_${dStr}`, // Unique ID
-            date: new Date(date),
-            dateStr: dStr,
-            label: `サブスク: ${sub.name}`,
-            amount: -amount,
-            type: "sub"
-          });
-          date = addMonths(date, 1);
+          // Only add if schedule is >= start (Forecast might look back a bit? No, start is today)
+          if (date >= start) {
+            events.push({
+              id: `sub_${sub.id}_${dStr}`, // Unique ID
+              date: new Date(date),
+              dateStr: dStr,
+              label: `サブスク: ${sub.name}`,
+              amount: -amount,
+              type: "sub"
+            });
+          }
+
+          // Advance date based on frequency
+          if (sub.frequency === "yearly") {
+            date = addMonths(date, 12);
+          } else {
+            // Default to monthly
+            date = addMonths(date, 1);
+          }
         }
       });
 
@@ -218,7 +243,7 @@ export function useForecast(monthsToForecast: number = 6) {
       const cardBills = new Map<string, { date: Date; amount: number; cardName: string }>();
 
       transactions.forEach(t => {
-        if (t.type !== "expense") return;
+        if (t.type !== "expense" && t.type !== "card_payment") return;
 
         const card = cardAccounts.find(c => (c.paymentKey === t.payment || c.name === t.payment));
         if (!card) return;
@@ -275,14 +300,19 @@ export function useForecast(monthsToForecast: number = 6) {
         };
       });
 
-      // 6. Find Next Payment (First negative event)
-      const nextPayment = events.find(e => e.amount < 0 && e.date >= today) || null;
+      // 6. Find Next Payments (Top 3 negative events)
+      const upcomingPayments = events
+        .filter(e => e.amount < 0 && e.date >= today)
+        .slice(0, 3);
+
+      const nextPayment = upcomingPayments[0] || null;
 
       setResult({
         events,
         startBalance: currentAssetBalance,
         balanceHistory: history,
         nextPaymentEvent: nextPayment,
+        upcomingPayments, // Add this
         loading: false
       });
 

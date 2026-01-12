@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import { useForecast } from "./hooks/useForecast";
+import { useBudgetCoach } from "./hooks/useBudgetCoach";
 
 type Totals = {
   [key: string]: number;
@@ -30,7 +31,7 @@ export default function Home() {
   const [categoryBudget, setCategoryBudget] = useState<Totals>({});
 
   // Forecast Hook for "Next Payment"
-  const { nextPaymentEvent, startBalance, loading: forecastLoading } = useForecast(3);
+  const { nextPaymentEvent, upcomingPayments, startBalance, loading: forecastLoading } = useForecast(3);
 
   // Load Budget & Expenses
   useEffect(() => {
@@ -144,24 +145,28 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3. Next Payment (from Forecast) */}
-        <div className="app-card" style={{ marginBottom: 0 }}>
-          <h2 style={{ fontSize: 13, color: "#7a6a55" }}>次の支払い</h2>
+        {/* 3. Upcoming Payments (Top 3) */}
+        <div className="app-card" style={{ marginBottom: 0, paddingBottom: 8 }}>
+          <h2 style={{ fontSize: 13, color: "#7a6a55" }}>直近の支払い</h2>
           {forecastLoading ? (
             <p style={{ fontSize: 12 }}>計算中...</p>
-          ) : nextPaymentEvent ? (
-            <div style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 12, color: "#c44536", fontWeight: 600 }}>
-                {nextPaymentEvent.label}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
-                  ¥{Math.abs(nextPaymentEvent.amount).toLocaleString()}
-                </span>
-                <span style={{ fontSize: 11, color: "#9e8b78" }}>
-                  {nextPaymentEvent.dateStr.slice(5)}
-                </span>
-              </div>
+          ) : upcomingPayments && upcomingPayments.length > 0 ? (
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+              {upcomingPayments.map((evt) => (
+                <div key={evt.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ overflow: "hidden" }}>
+                    <div style={{ fontSize: 12, color: "#5d4330", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {evt.label.replace("サブスク: ", "").replace("返済: ", "")}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#9e8b78" }}>
+                      {evt.dateStr.slice(5).replace("-", "/")}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#c44536" }}>
+                    ¥{Math.abs(evt.amount).toLocaleString()}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <p style={{ fontSize: 12, color: "#9e8b78", marginTop: 4 }}>予定なし</p>
