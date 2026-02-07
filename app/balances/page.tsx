@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type TransactionType = "expense" | "income";
 
@@ -22,7 +23,7 @@ type Account = {
   type: AccountType;
   name: string;
   // memo など他のフィールドがあっても無視されるようにゆるく定義
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type IncomeSettings = {
@@ -46,7 +47,7 @@ type Subscription = {
 type AppSettings = {
   subscriptions?: Subscription[];
   // 他にも loan / saving などあってもそのまま
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 // 日付を "YYYY-MM-DD" 形式にするユーティリティ
@@ -104,7 +105,7 @@ function applyScheduledIncome(today: Date) {
 
   // 既存の transactions を取得
   const txRaw = localStorage.getItem("transactions");
-  let transactions: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
+  const transactions: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
 
   // 最後に自動反映した日付
   const lastAppliedRaw = localStorage.getItem("autoIncomeLastApplied");
@@ -215,7 +216,7 @@ function applyScheduledSubscriptions(today: Date) {
 
   // 既存の transactions を取得
   const txRaw = localStorage.getItem("transactions");
-  let transactions: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
+  const transactions: Transaction[] = txRaw ? JSON.parse(txRaw) : [];
 
   const lastAppliedRaw = localStorage.getItem("autoSubLastApplied");
   let fromDate: Date;
@@ -391,15 +392,17 @@ function BalancesContent() {
     walletList.sort((a, b) => a.name.localeCompare(b.name, "ja"));
     qrList.sort((a, b) => a.name.localeCompare(b.name, "ja"));
 
-    setBankRows(bankList);
-    setWalletRows(walletList);
-    setQrRows(qrList);
+    qrList.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+
+    setBankRows(bankList); // eslint-disable-line react-hooks/set-state-in-effect
+    setWalletRows(walletList); // eslint-disable-line react-hooks/set-state-in-effect
+    setQrRows(qrList); // eslint-disable-line react-hooks/set-state-in-effect
 
     const total =
       bankList.reduce((s, r) => s + r.balance, 0) +
       walletList.reduce((s, r) => s + r.balance, 0) +
       qrList.reduce((s, r) => s + r.balance, 0);
-    setTotalBalance(total);
+    setTotalBalance(total); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   return (
@@ -568,7 +571,7 @@ function BalancesContent() {
       </div>
 
       <div style={{ marginTop: 16, fontSize: 14 }}>
-        <a href="/">◀ ホームに戻る</a>
+        <Link href="/">◀ ホームに戻る</Link>
       </div>
     </div>
   );

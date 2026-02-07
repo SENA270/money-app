@@ -6,12 +6,17 @@ import TransactionQuickForm from "../components/Input/TransactionQuickForm";
 import ReceiptScanner from "../components/ReceiptScanner";
 import { saveTransaction } from "../lib/transaction/saveTransaction";
 import { supabase } from "../../lib/supabaseClient";
+import { useCategories } from "../hooks/useCategories";
+import { usePaymentMethods } from "../hooks/usePaymentMethods";
 
 export default function InputPage() {
   const [mode, setMode] = useState<"manual" | "camera">("manual");
   const [ocrResult, setOcrResult] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState("");
+
+  const { categories } = useCategories();
+  const { paymentMethods } = usePaymentMethods();
 
   const handleSuccess = () => {
     setMessage("記録しました！");
@@ -32,54 +37,50 @@ export default function InputPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Login required");
 
-      // Resolve Default Payment Method (Same logic as QuickForm)
-      let paymentMethod = "";
-      let type: "expense" | "card_payment" = "expense";
-
-      if (typeof window !== "undefined") {
-        const accRaw = localStorage.getItem("accounts");
-        const lastUsed = localStorage.getItem("lastUsedAccountName");
-
-        if (accRaw) {
-          const accounts = JSON.parse(accRaw);
-
-          // Try to find last used
-          let account = accounts.find((a: any) => a.name === lastUsed);
-
-          // If not found or card logic needed
-          if (!account && accounts.length > 0) {
-            // Default to first bank/wallet if available, else first whatever
-            account = accounts.find((a: any) => a.type !== "card") || accounts[0];
-          }
-
-          if (account) {
-            paymentMethod = account.name;
-            if (account.type === "card") {
-              type = "card_payment";
-            }
-          }
-        }
+      // 1. Resolve Category
+      let categoryId = "";
+      if (ocrResult.category) {
+        const match = categories.find(c => c.name === ocrResult.category);
+        if (match) categoryId = match.id;
+      }
+      // If not found, use first available or error?
+      // Better to default to first expense category
+      if (!categoryId && categories.length > 0) {
+        categoryId = categories[0].id; // Fallback
       }
 
-      // If still no payment method (e.g. fresh install), default to "現金"?
-      // Or fail? "現金" is safe fallback for OCR if user hasn't set up?
-      // Better to force Edit in that case?
-      // Let's default to "現金" as passing implicit string is better than failing.
-      if (!paymentMethod) paymentMethod = "現金";
+      // 2. Resolve Payment Method
+      // Use last used or default
+      let paymentMethodId = "";
+      if (typeof window !== "undefined") {
+        const lastUsedId = localStorage.getItem("lastUsedPaymentMethodId");
+        if (lastUsedId && paymentMethods.find(p => p.id === lastUsedId)) {
+          paymentMethodId = lastUsedId;
+        }
+      }
+      if (!paymentMethodId && paymentMethods.length > 0) {
+        // Default to first 'wallet' or just first
+        const pref = paymentMethods.find(p => p.type === 'cash') || paymentMethods[0];
+        paymentMethodId = pref.id;
+      }
+
+      if (!categoryId || !paymentMethodId) {
+        throw new Error("カテゴリまたは支払い方法が特定できません。修正してください。");
+      }
 
       await saveTransaction({
         user_id: user.id,
         amount: Number(ocrResult.amount),
-        type: type,
-        category: ocrResult.category || "未分類",
+        type: "expense", // OCR usually assumes expense
+        category_id: categoryId,
+        payment_method_id: paymentMethodId,
         date: ocrResult.date || new Date().toISOString().slice(0, 10),
         memo: ocrResult.storeName,
-        paymentMethod: paymentMethod
       });
 
       // Update Last Used
       if (typeof window !== "undefined") {
-        localStorage.setItem("lastUsedAccountName", paymentMethod);
+        localStorage.setItem("lastUsedPaymentMethodId", paymentMethodId);
       }
 
       setOcrResult(null);
@@ -92,6 +93,7 @@ export default function InputPage() {
 
   return (
     <div className="page-container padding-bottom-nav">
+
       {/* Header */}
       <h1 style={{ marginBottom: 16 }}>入力</h1>
 
@@ -134,7 +136,7 @@ export default function InputPage() {
             </div>
             <div className="list-row">
               <span>カテゴリ</span>
-              <span>{ocrResult.category}</span>
+              <span>{ocrResult.category || "(自動判定不能)"}</span>
             </div>
           </div>
 
@@ -190,3 +192,4 @@ export default function InputPage() {
     </div>
   );
 }
+

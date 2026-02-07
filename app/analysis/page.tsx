@@ -10,9 +10,10 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  Title,
 } from "chart.js";
 import { Doughnut, Bar } from "react-chartjs-2";
-import { supabase } from "@lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 
 ChartJS.register(
   ArcElement,
@@ -20,35 +21,22 @@ ChartJS.register(
   Legend,
   CategoryScale,
   LinearScale,
-  BarElement
+  BarElement,
+  Title
 );
-
-type TransactionType = "expense" | "income";
 
 type Transaction = {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   amount: number;
-  type: TransactionType;
+  type: "expense" | "income" | "repayment" | "card_payment";
   category: string;
-  payment: string; // 支払い方法（口座名 / カードキー など）
+  payment: string; // Legacy name
   memo: string;
-};
-
-type AccountType = "bank" | "wallet" | "qr" | "card";
-
-type Account = {
-  id: string;
-  type: AccountType;
-  name: string;
-  balance?: number;
-  closingDay?: number;
-  paymentDay?: number;
-  paymentKey?: string;
-};
-
-type CardBillTotals = {
-  [cardName: string]: number;
+  payment_methods?: {
+    name: string;
+    type: "cash" | "bank" | "card" | "wallet";
+  };
 };
 
 // 表示用の年月ラベル
@@ -56,42 +44,36 @@ function monthLabel(year: number, month: number): string {
   return `${year}年${month}月`;
 }
 
-// カード請求の締め/支払ロジック（bills と同じ考え方）
-function calcBillingDate(
-  useDate: Date,
-  closingDay: number,
-  paymentDay: number
-): Date {
-  const year = useDate.getFullYear();
-  const day = useDate.getDate();
-
-  // 基本は「利用月の翌月」が引き落とし月
-  // 締め日より後の利用は「翌々月」
-  let billingMonthIndex = useDate.getMonth() + 1; // 翌月
-  if (day > closingDay) {
-    billingMonthIndex += 1; // 翌々月
-  }
-
-  return new Date(year, billingMonthIndex, paymentDay);
-}
-
-// =============== ここから中身コンポーネント ===============
-function AnalysisContent() {
+export default function AnalysisPage() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
+  const [loading, setLoading] = useState(true);
 
+  // Current Month Totals
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
+  const [repaymentTotal, setRepaymentTotal] = useState(0);
 
-  const [categoryTotals, setCategoryTotals] = useState<{ [key: string]: number }>(
-    {}
-  );
-  const [cardBillsForMonth, setCardBillsForMonth] = useState<CardBillTotals>({});
+  // Comparison
+  const [lastMonthExpense, setLastMonthExpense] = useState(0);
+
+  // Breakdown
+  const [repaymentBreakdown, setRepaymentBreakdown] = useState<{ name: string, amount: number }[]>([]);
+
+  // Chart Data
+  const [dailyData, setDailyData] = useState<number[]>([]);
+  const [dailyLabels, setDailyLabels] = useState<string[]>([]);
+
+  const [categoryLabels, setCategoryLabels] = useState<string[]>([]);
+  const [categoryData, setCategoryData] = useState<number[]>([]);
+
+  const [paymentLabels, setPaymentLabels] = useState<string[]>([]);
+  const [paymentData, setPaymentData] = useState<number[]>([]);
 
   const label = monthLabel(viewYear, viewMonth);
 
-  // ▼ 月送り
+  // Month Navigation
   const handlePrevMonth = () => {
     setViewMonth((prev) => {
       if (prev === 1) {
@@ -112,310 +94,304 @@ function AnalysisContent() {
     });
   };
 
-  // ① 表示中の月の「収入・支出」「カテゴリ別支出」を集計（Supabase）
   useEffect(() => {
     const load = async () => {
-      // 1. ログイン中ユーザー取得
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error("getUser error", userError);
-        return;
-      }
-      const user = userData?.user;
-      if (!user) return;
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      // 2. そのユーザーの全 transactions を取得
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user.id);
+        // Calculate Date Ranges
+        // Current Month
+        const currentStart = `${viewYear}-${String(viewMonth).padStart(2, '0')}-01`;
+        const currentEndObj = new Date(viewYear, viewMonth, 0); // Last day of viewMonth
+        const currentEnd = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${currentEndObj.getDate()}`;
 
-      if (error) {
-        console.error("analysis supabase load error", error);
-        return;
-      }
-
-      // 3. 従来ロジックで集計
-      let income = 0;
-      let expense = 0;
-      const catTotals: { [key: string]: number } = {};
-
-      (data || []).forEach((t) => {
-        if (!t.date) return;
-        const d = new Date(t.date);
-        const y = d.getFullYear();
-        const m = d.getMonth() + 1;
-        if (y !== viewYear || m !== viewMonth) return;
-
-        if (t.type === "income") {
-          income += t.amount;
-        } else if (t.type === "expense") {
-          expense += t.amount;
-
-          const key = t.category || "その他";
-          if (!catTotals[key]) catTotals[key] = 0;
-          catTotals[key] += t.amount;
+        // Previous Month
+        let lastYear = viewYear;
+        let lastMonth = viewMonth - 1;
+        if (lastMonth === 0) {
+          lastMonth = 12;
+          lastYear -= 1;
         }
-      });
+        const lastStart = `${lastYear}-${String(lastMonth).padStart(2, '0')}-01`;
 
-      setIncomeTotal(income);
-      setExpenseTotal(expense);
-      setCategoryTotals(catTotals);
+        // Fetch BOTH months
+        // range: lastStart to currentEnd
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*, payment_methods(name, type)")
+          .eq("user_id", user.id)
+          .gte("date", lastStart)
+          .lte("date", currentEnd);
+
+        if (error) throw error;
+
+        const txs = (data || []) as Transaction[];
+
+        // Aggregators
+        let curIncome = 0;
+        let curExpense = 0;
+        let curRepayment = 0;
+        let prevExpense = 0;
+
+        const dailyMap = new Array(32).fill(0); // Index 1-31
+        const catMap: { [key: string]: number } = {};
+        const payMap: { [key: string]: number } = {};
+        const repayMap: { [key: string]: number } = {};
+
+        txs.forEach((t) => {
+          const d = new Date(t.date);
+          const tYear = d.getFullYear();
+          const tMonth = d.getMonth() + 1;
+          const amt = Number(t.amount);
+
+          const isCurrent = tYear === viewYear && tMonth === viewMonth;
+          const isLast = tYear === lastYear && tMonth === lastMonth;
+
+          if (isLast) {
+            if (t.type === "expense") {
+              prevExpense += amt;
+            }
+          }
+
+          if (isCurrent) {
+            if (t.type === "income") {
+              curIncome += amt;
+            } else if (t.type === "repayment") {
+              curRepayment += amt;
+              // Repayment Breakdown
+              // Use Memo or Category or generic name
+              const name = t.memo || t.category || "返済";
+              repayMap[name] = (repayMap[name] || 0) + amt;
+
+            } else if (t.type === "expense") {
+              curExpense += amt;
+
+              // 1. Daily Trend
+              const day = d.getDate();
+              dailyMap[day] += amt;
+
+              // 2. Category Ranking
+              const cat = t.category || "未分類";
+              catMap[cat] = (catMap[cat] || 0) + amt;
+
+              // 3. Payment Method
+              let pType = "現金・その他";
+              if (t.payment_methods?.type === "card") pType = "カード";
+              else if (t.payment_methods?.type === "bank") pType = "銀行";
+              else if (t.payment_methods?.type === "cash") pType = "現金";
+              else if (t.payment_methods?.type === "wallet") pType = "電子マネー";
+
+              payMap[pType] = (payMap[pType] || 0) + amt;
+            }
+          }
+        });
+
+        setIncomeTotal(curIncome);
+        setExpenseTotal(curExpense);
+        setRepaymentTotal(curRepayment);
+        setLastMonthExpense(prevExpense);
+
+        // Repayment List
+        setRepaymentBreakdown(Object.entries(repayMap).map(([name, amount]) => ({ name, amount })));
+
+        // Daily Data
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+        setDailyLabels(Array.from({ length: daysInMonth }, (_, i) => `${i + 1}`));
+        setDailyData(dailyMap.slice(1, daysInMonth + 1));
+
+        // Category Ranking (Top 5)
+        const sortedCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+        const top5 = sortedCats.slice(0, 5);
+        const others = sortedCats.slice(5).reduce((sum, [, val]) => sum + val, 0);
+
+        const finalCatLabels = top5.map(([k]) => k);
+        const finalCatData = top5.map(([, v]) => v);
+        if (others > 0) {
+          finalCatLabels.push("その他");
+          finalCatData.push(others);
+        }
+        setCategoryLabels(finalCatLabels);
+        setCategoryData(finalCatData);
+
+        // Payment Method
+        setPaymentLabels(Object.keys(payMap));
+        setPaymentData(Object.values(payMap));
+
+      } catch (err) {
+        console.error("Analysis load error", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     load();
   }, [viewYear, viewMonth]);
 
-  // ② 表示中の月の「カード請求額（引き落とし月ベース）」を集計（Supabase）
-  useEffect(() => {
-    try {
-      const load = async () => {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) {
-          console.error("getUser error", userError);
-          setCardBillsForMonth({});
-          return;
-        }
-        const user = userData?.user;
-        if (!user) {
-          setCardBillsForMonth({});
-          return;
-        }
+  const diff = incomeTotal - (expenseTotal + repaymentTotal);
+  const expenseDiff = expenseTotal - lastMonthExpense;
+  const expenseDiffPercent = lastMonthExpense > 0 ? Math.round((expenseDiff / lastMonthExpense) * 100) : 0;
 
-        const { data: txs, error: txError } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (txError) {
-          console.error("analysis: transactions fetch error", txError);
-          setCardBillsForMonth({});
-          return;
-        }
-
-        // カード口座の情報はまだ localStorage 依存なのでそのまま使う
-        const accRaw = localStorage.getItem("accounts");
-        const accounts: Account[] = accRaw ? JSON.parse(accRaw) : [];
-
-        const cardAccounts = accounts.filter((a) => a.type === "card");
-        const matchMap = new Map<string, Account>();
-
-        cardAccounts.forEach((card) => {
-          const nameKey = card.name?.trim();
-          const payKey = card.paymentKey?.trim();
-          if (nameKey) matchMap.set(nameKey, card);
-          if (payKey) matchMap.set(payKey, card);
-        });
-
-        const totals: CardBillTotals = {};
-
-        (txs || []).forEach((t: Transaction) => {
-          if (t.type !== "expense") return;
-          if (!t.payment) return;
-
-          const card = matchMap.get(t.payment.trim());
-          if (!card) return;
-          if (card.closingDay == null || card.paymentDay == null) return;
-
-          if (!t.date) return;
-          const useDate = new Date(t.date);
-          if (Number.isNaN(useDate.getTime())) return;
-
-          const billDate = calcBillingDate(
-            useDate,
-            card.closingDay ?? 0,
-            card.paymentDay ?? 1
-          );
-          const y = billDate.getFullYear();
-          const m = billDate.getMonth() + 1;
-
-          // 表示中の「請求月」と一致するものだけ
-          if (y !== viewYear || m !== viewMonth) return;
-
-          const key = card.name || "不明なカード";
-          if (!totals[key]) totals[key] = 0;
-          totals[key] += t.amount;
-        });
-
-        setCardBillsForMonth(totals);
-      };
-
-      load();
-    } catch (e) {
-      console.error("analysis: card bills 集計失敗", e);
-      setCardBillsForMonth({});
-    }
-  }, [viewYear, viewMonth]);
-
-  const diff = incomeTotal - expenseTotal;
-
-  // ▼ カテゴリ別円グラフ
-  const categoryNames = Object.keys(categoryTotals);
-  const hasCategoryData = categoryNames.length > 0;
-
-  const doughnutData = hasCategoryData
-    ? {
-      labels: categoryNames,
-      datasets: [
-        {
-          data: categoryNames.map((c) => categoryTotals[c]),
-          backgroundColor: [
-            "#f2b591",
-            "#e8ddc7",
-            "#c4a484",
-            "#f6c453",
-            "#b9d6a3",
-            "#f7a072",
-            "#c9a0dc",
-          ],
-          borderColor: "#f9f4ea",
-          borderWidth: 2,
-        },
-      ],
-    }
-    : {
-      labels: ["データなし"],
-      datasets: [
-        {
-          data: [1],
-          backgroundColor: ["#e0d6c4"],
-        },
-      ],
-    };
-
-  const doughnutOptions: any = {
-    plugins: {
-      legend: {
-        position: "bottom" as const,
-        labels: { color: "#3b2a1a" },
-      },
-    },
-  };
-
-  // ▼ カード別棒グラフ
-  const cardNames = Object.keys(cardBillsForMonth);
-  const hasCardData = cardNames.length > 0;
-
-  const barData = {
-    labels: cardNames,
-    datasets: [
-      {
-        label: "請求額",
-        data: cardNames.map((n) => cardBillsForMonth[n]),
-        backgroundColor: "#f2b591",
-      },
-    ],
-  };
-
-  const barOptions: any = {
+  // Chart Options
+  const barOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: "top" as const,
-      },
+      legend: { display: false },
     },
     scales: {
-      x: {
-        ticks: {
-          color: "#3b2a1a",
-        },
-      },
-      y: {
-        ticks: {
-          color: "#3b2a1a",
-        },
-      },
+      y: { beginAtZero: true, grid: { color: "#f0f0f0" } },
+      x: { grid: { display: false } }
     },
+  };
+
+  const horizontalBarOptions = {
+    indexAxis: 'y' as const,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      x: { display: false },
+      y: { grid: { display: false } }
+    }
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' as const, labels: { boxWidth: 12, padding: 15 } },
+    },
+    cutout: "60%",
   };
 
   return (
-    <div className="page-container">
-      <h1>分析</h1>
-      <p style={{ marginBottom: 16, fontSize: 14 }}>
-        カテゴリ別・カード別の支出を確認できるページです。
-      </p>
+    <div className="page-container" style={{ paddingBottom: 100, background: "#fafafa" }}>
+      <h1 className="page-title">家計分析</h1>
 
-      {/* 月送り */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 16,
-          fontSize: 14,
-        }}
-      >
-        <button
-          type="button"
-          onClick={handlePrevMonth}
-          className="btn-secondary"
-          style={{ padding: "4px 12px", minHeight: "32px" }}
-        >
-          ← 前の月
-        </button>
-        <span style={{ fontWeight: 600 }}>表示中: {label}</span>
-        <button
-          type="button"
-          onClick={handleNextMonth}
-          className="btn-secondary"
-          style={{ padding: "4px 12px", minHeight: "32px" }}
-        >
-          次の月 →
-        </button>
+      {/* Month Selector */}
+      <div className="card-base" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "12px 16px" }}>
+        <button className="btn-icon" onClick={handlePrevMonth}>←</button>
+        <span style={{ fontSize: 16, fontWeight: "bold", color: "#333" }}>{label}</span>
+        <button className="btn-icon" onClick={handleNextMonth}>→</button>
       </div>
 
-      {/* 先頭：その月のサマリー */}
-      <div className="app-card" style={{ marginBottom: 24 }}>
-        <h2>{label}のサマリー</h2>
-        <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-          <p>収入：¥{incomeTotal.toLocaleString()}</p>
-          <p>支出：¥{expenseTotal.toLocaleString()}</p>
-          <p>
-            差額：
-            <span
-              style={{
-                color: diff < 0 ? "#c44536" : "#3b2a1a",
-                fontWeight: 600,
+      {/* Summary Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        {/* Expense Card (Primary) */}
+        <div className="app-card" style={{ padding: 16, background: "#fff" }}>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>今月の支出</div>
+          <div style={{ fontSize: 20, fontWeight: "bold", color: "#333" }}>¥{expenseTotal.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: expenseDiff > 0 ? "#e53935" : "#43a047", marginTop: 4 }}>
+            先月比: {expenseDiff > 0 ? '+' : ''}{expenseDiff.toLocaleString()} ({expenseDiffPercent > 0 ? '+' : ''}{expenseDiffPercent}%)
+          </div>
+        </div>
+
+        {/* Balance Card */}
+        <div className="app-card" style={{ padding: 16, background: "#fff" }}>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>収支差額</div>
+          <div style={{ fontSize: 20, fontWeight: "bold", color: diff >= 0 ? "#333" : "#e53935" }}>
+            ¥{diff.toLocaleString()}
+          </div>
+          <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
+            収入: ¥{incomeTotal.toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* 1. Daily Trend */}
+      <div className="app-card" style={{ marginBottom: 20, padding: "16px" }}>
+        <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16, color: "#333" }}>日別推移</h3>
+        <div style={{ height: 180 }}>
+          <Bar
+            data={{
+              labels: dailyLabels,
+              datasets: [{
+                label: "支出",
+                data: dailyData,
+                backgroundColor: (ctx) => {
+                  const val = ctx.raw as number;
+                  const avg = expenseTotal / (dailyData.length || 1);
+                  return val > avg * 1.5 ? "#e57373" : "#bcaaa4"; // Highlight spikes
+                },
+                borderRadius: 4,
+              }]
+            }}
+            options={barOptions}
+          />
+        </div>
+      </div>
+
+      {/* 2. Category Ranking */}
+      <div className="app-card" style={{ marginBottom: 20, padding: "16px" }}>
+        <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16, color: "#333" }}>カテゴリ別トップ5</h3>
+        <div style={{ height: 200 }}>
+          {categoryData.length > 0 ? (
+            <Bar
+              data={{
+                labels: categoryLabels,
+                datasets: [{
+                  label: "支出",
+                  data: categoryData,
+                  backgroundColor: ["#8d6e63", "#a1887f", "#bcaaa4", "#d7ccc8", "#efebe9", "#eee"],
+                  borderRadius: 4,
+                  barThickness: 20,
+                }]
               }}
-            >
-              ¥{diff.toLocaleString()}
-            </span>
-          </p>
+              options={horizontalBarOptions}
+            />
+          ) : (
+            <div style={{ textAlign: "center", color: "#999", paddingTop: 60 }}>データなし</div>
+          )}
         </div>
       </div>
 
       <div className="grid-container">
-        {/* カテゴリ別 円グラフ */}
-        <div className="app-card" style={{ marginBottom: 0 }}>
-          <h2>カテゴリ別（円グラフ）</h2>
-          {hasCategoryData ? (
-            <div style={{ position: "relative", height: "300px", width: "100%" }}>
-              <Doughnut data={doughnutData} options={{ ...doughnutOptions, maintainAspectRatio: false }} />
-            </div>
-          ) : (
-            <p style={{ marginTop: 8 }}>この月の支出データがまだありません。</p>
-          )}
+        {/* 3. Payment Method */}
+        <div className="app-card" style={{ marginBottom: 0, padding: "16px" }}>
+          <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16, color: "#333" }}>支払い方法</h3>
+          <div style={{ height: 180 }}>
+            {paymentData.length > 0 ? (
+              <Doughnut
+                data={{
+                  labels: paymentLabels,
+                  datasets: [{
+                    data: paymentData,
+                    backgroundColor: ["#ffb74d", "#4db6ac", "#9575cd", "#90a4ae"],
+                    borderWidth: 0,
+                  }]
+                }}
+                options={doughnutOptions}
+              />
+            ) : (
+              <div style={{ textAlign: "center", color: "#999", paddingTop: 60 }}>データなし</div>
+            )}
+          </div>
         </div>
 
-        {/* カード別棒グラフ */}
-        <div className="app-card" style={{ marginBottom: 0 }}>
-          <h2>カード別 請求額</h2>
-          {hasCardData ? (
-            <div style={{ position: "relative", height: "300px", width: "100%" }}>
-              <Bar data={barData} options={{ ...barOptions, maintainAspectRatio: false }} />
+        {/* 4. Repayment (Separate) */}
+        <div className="app-card" style={{ marginBottom: 0, padding: "16px" }}>
+          <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 8, color: "#333" }}>ローン返済</h3>
+          <div style={{ fontSize: 24, fontWeight: "bold", color: "#5d4330", marginBottom: 12 }}>
+            ¥{repaymentTotal.toLocaleString()}
+          </div>
+          {repaymentBreakdown.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {repaymentBreakdown.map((item, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, borderBottom: "1px solid #eee", paddingBottom: 4 }}>
+                  <span style={{ color: "#666" }}>{item.name}</span>
+                  <span>¥{item.amount.toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           ) : (
-            <p style={{ marginTop: 8 }}>
-              この月に引き落とし予定のカード請求はありません。
-            </p>
+            <div style={{ fontSize: 12, color: "#999" }}>今月の返済はありません</div>
           )}
         </div>
       </div>
     </div>
   );
-}
-
-// =============== 最終 export ===============
-export default function AnalysisPage() {
-  return <AnalysisContent />;
 }

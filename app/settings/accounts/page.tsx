@@ -1,477 +1,235 @@
-// app/settings/accounts/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePaymentMethods } from "../../hooks/usePaymentMethods";
+import { PaymentMethod, PaymentMethodType } from "../../types";
 
-type AccountType = "bank" | "wallet" | "qr" | "card";
+const CARD_PRESETS = [
+  { label: "末締め / 翌月27日払い (楽天など)", close: 99, pay: 27 },
+  { label: "15日締め / 翌月10日払い (JCBなど)", close: 15, pay: 10 },
+  { label: "末締め / 翌月10日払い", close: 99, pay: 10 },
+];
 
-type Account = {
-  id: string;
-  type: AccountType;
-  name: string;
-  // カード専用
-  closingDay?: number; // 締め日
-  paymentDay?: number; // 支払日（翌月）
-  paymentKey?: string; // 内訳キー（明細の payment と紐付ける用）
-};
+export default function AccountSettingsPage() {
+  const { paymentMethods, loading, addPaymentMethod, updatePaymentMethod, deletePaymentMethod, refresh } = usePaymentMethods();
 
-function createEmptyAccount(type: AccountType): Account {
-  return {
-    id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type,
-    name: "",
+  // Balance Update (Debounced or Blur? For MVP, onBlur is safer, or simplified local state)
+  // For simplicity, we trigger update immediately but usually that spams DB.
+  // Better: local state for input, update on blur?
+  // MVP: Let's simpler: Just update on Blur. To do that, we need local state or uncontrolled input.
+  // Simplest for now: Use a small component or just simple prompt? 
+  // No, the UI has inputs list.
+
+  const handleUpdateBalance = async (id: string, val: string) => {
+    // Allow empty string for visual, but don't save NaN
+    if (val === "") return;
+    const num = Number(val);
+    if (isNaN(num)) return;
+
+    try {
+      await updatePaymentMethod(id, { balance: num });
+    } catch (e) {
+      console.error("Failed to update balance");
+    }
   };
-}
 
-function AccountSettingsInnerPage() {
-  const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
-  const [walletAccounts, setWalletAccounts] = useState<Account[]>([]);
-  const [qrAccounts, setQrAccounts] = useState<Account[]>([]);
-  const [cardAccounts, setCardAccounts] = useState<Account[]>([]);
+  // Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<PaymentMethod>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  // 初期読み込み
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Grouping
+  const assets = paymentMethods.filter(a => a.type !== "card");
+  const liabilities = paymentMethods.filter(a => a.type === "card");
 
-    const raw = localStorage.getItem("accounts");
-    if (!raw) {
-      // 何もなければ1行だけ空行を出しておく
-      setBankAccounts([createEmptyAccount("bank")]);
-      setWalletAccounts([createEmptyAccount("wallet")]);
-      setQrAccounts([createEmptyAccount("qr")]);
-      setCardAccounts([createEmptyAccount("card")]);
+  const handleAddAccount = (type: PaymentMethodType) => {
+    const newAcc: Partial<PaymentMethod> = {
+      type,
+      name: "",
+      closing_day: type === "card" ? 99 : undefined,
+      payment_day: type === "card" ? 27 : undefined
+    };
+    setEditingId("new");
+    setEditForm(newAcc);
+  };
+
+  const startEdit = (acc: PaymentMethod) => {
+    setEditingId(acc.id);
+    setEditForm({ ...acc });
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.name || !editForm.name.trim()) {
+      alert("名称を入力してください");
       return;
     }
 
-    try {
-      const parsed = JSON.parse(raw) as Account[];
-
-      const banks = parsed.filter((a) => a.type === "bank");
-      const wallets = parsed.filter((a) => a.type === "wallet");
-      const qrs = parsed.filter((a) => a.type === "qr");
-      const cards = parsed.filter((a) => a.type === "card");
-
-      setBankAccounts(
-        (banks.length ? banks : [createEmptyAccount("bank")]).sort((a, b) =>
-          a.name.localeCompare(b.name, "ja")
-        )
-      );
-      setWalletAccounts(
-        (wallets.length ? wallets : [createEmptyAccount("wallet")]).sort(
-          (a, b) => a.name.localeCompare(b.name, "ja")
-        )
-      );
-      setQrAccounts(
-        (qrs.length ? qrs : [createEmptyAccount("qr")]).sort((a, b) =>
-          a.name.localeCompare(b.name, "ja")
-        )
-      );
-      setCardAccounts(
-        (cards.length ? cards : [createEmptyAccount("card")]).sort((a, b) =>
-          a.name.localeCompare(b.name, "ja")
-        )
-      );
-    } catch (e) {
-      console.error("accounts の読み込みに失敗しました", e);
-      setBankAccounts([createEmptyAccount("bank")]);
-      setWalletAccounts([createEmptyAccount("wallet")]);
-      setQrAccounts([createEmptyAccount("qr")]);
-      setCardAccounts([createEmptyAccount("card")]);
+    // Card Guard
+    if (editForm.type === "card") {
+      if (!editForm.closing_day || !editForm.payment_day) {
+        alert("カードの場合、締め日と支払日は必須です。\nプリセットから選ぶか、手動で入力してください。");
+        return;
+      }
     }
-  }, []);
-
-  // 共通：名称変更（銀行・財布・QR・カード）
-  const handleNameChange =
-    (type: AccountType, id: string) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        const update = (list: Account[]): Account[] =>
-          list.map((a) => (a.id === id ? { ...a, name: value } : a));
-
-        if (type === "bank") setBankAccounts((prev) => update(prev));
-        if (type === "wallet") setWalletAccounts((prev) => update(prev));
-        if (type === "qr") setQrAccounts((prev) => update(prev));
-        if (type === "card") setCardAccounts((prev) => update(prev));
-      };
-
-  // カード専用：締め日・支払日
-  const handleCardNumberChange =
-    (id: string, field: "closingDay" | "paymentDay") =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const raw = e.target.value;
-        const num = raw === "" ? undefined : Number(raw);
-
-        setCardAccounts((prev) =>
-          prev.map((a) =>
-            a.id === id
-              ? { ...a, [field]: num && !Number.isNaN(num) ? num : undefined }
-              : a
-          )
-        );
-      };
-
-  // カード専用：内訳キー
-  const handleCardPaymentKeyChange =
-    (id: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setCardAccounts((prev) =>
-        prev.map((a) =>
-          a.id === id ? { ...a, paymentKey: value } : a
-        )
-      );
-    };
-
-  const handleAddRow = (type: AccountType) => {
-    if (type === "bank")
-      setBankAccounts((prev) => [...prev, createEmptyAccount("bank")]);
-    if (type === "wallet")
-      setWalletAccounts((prev) => [...prev, createEmptyAccount("wallet")]);
-    if (type === "qr")
-      setQrAccounts((prev) => [...prev, createEmptyAccount("qr")]);
-    if (type === "card")
-      setCardAccounts((prev) => [...prev, createEmptyAccount("card")]);
-  };
-
-  const handleRemoveRow = (type: AccountType, id: string) => {
-    const remove = (list: Account[]): Account[] =>
-      list.filter((a) => a.id !== id);
-
-    if (type === "bank")
-      setBankAccounts((prev) =>
-        remove(prev).length === 0 ? [createEmptyAccount("bank")] : remove(prev)
-      );
-    if (type === "wallet")
-      setWalletAccounts((prev) =>
-        remove(prev).length === 0 ? [createEmptyAccount("wallet")] : remove(prev)
-      );
-    if (type === "qr")
-      setQrAccounts((prev) =>
-        remove(prev).length === 0 ? [createEmptyAccount("qr")] : remove(prev)
-      );
-    if (type === "card")
-      setCardAccounts((prev) =>
-        remove(prev).length === 0 ? [createEmptyAccount("card")] : remove(prev)
-      );
-  };
-
-  const handleSave = () => {
-    if (typeof window === "undefined") return;
-
-    const clean = (list: Account[]) =>
-      list.filter((a) => a.name.trim() !== "");
-
-    const merged: Account[] = [
-      ...clean(bankAccounts).map((a) => ({ ...a, type: "bank" as const })),
-      ...clean(walletAccounts).map((a) => ({ ...a, type: "wallet" as const })),
-      ...clean(qrAccounts).map((a) => ({ ...a, type: "qr" as const })),
-      ...clean(cardAccounts).map((a) => ({ ...a, type: "card" as const })),
-    ];
 
     try {
-      localStorage.setItem("accounts", JSON.stringify(merged));
-      alert("口座・財布・QR・カードの設定を保存しました！");
+      setIsSaving(true);
+      if (editingId === "new") {
+        await addPaymentMethod(editForm as any);
+      } else if (editingId) {
+        await updatePaymentMethod(editingId, editForm);
+      }
+      setEditingId(null);
+      setEditForm({});
+      refresh(); // Reload to be safe
     } catch (e) {
-      console.error("accounts の保存に失敗しました", e);
-      alert("保存に失敗しました…（コンソールを確認してみてください）");
+      alert("保存に失敗しました");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const renderSimpleTable = (
-    type: AccountType,
-    rows: Account[],
-    title: string
-  ) => (
-    <div className="app-card" style={{ marginBottom: 16 }}>
-      <h2>{title}</h2>
-      {/* Desktop Table */}
-      <div className="table-wrapper desktop-table-view">
-        <table className="table-basic" style={{ minWidth: "350px" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>名称</th>
-              <th style={{ textAlign: "center", width: "80px" }}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  <input
-                    type="text"
-                    value={a.name}
-                    onChange={handleNameChange(type, a.id)}
-                    className="form-input"
-                    placeholder="名称を入力"
-                  />
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow(type, a.id)}
-                    className="btn-secondary"
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "12px",
-                      minHeight: "auto",
-                      backgroundColor: "#fff5f3",
-                      color: "#c44536",
-                      borderColor: "#c44536",
-                    }}
-                  >
-                    削除
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  const handleDelete = async (id: string) => {
+    if (!confirm("削除してよろしいですか？\n※この支払い方法に紐づく過去の取引がある場合、集計に影響が出る可能性があります。")) return;
+    try {
+      await deletePaymentMethod(id);
+    } catch (e) {
+      alert("削除に失敗しました");
+    }
+  };
 
-      {/* Mobile Card View */}
-      <div className="mobile-card-view">
-        {rows.map((a) => (
-          <div key={a.id} className="list-card-item">
-            <div className="list-card-row">
-              <span className="list-card-label" style={{ width: "40px" }}>名称</span>
-              <input
-                type="text"
-                value={a.name}
-                onChange={handleNameChange(type, a.id)}
-                className="form-input"
-                placeholder="名称を入力"
-                style={{ flex: 1, padding: "8px" }}
-              />
-            </div>
-            <div style={{ marginTop: 12, textAlign: "right", paddingTop: 8, borderTop: "1px dashed #eee" }}>
-              <button
-                type="button"
-                onClick={() => handleRemoveRow(type, a.id)}
-                className="btn-secondary"
-                style={{
-                  padding: "6px 16px",
-                  backgroundColor: "#fff5f3",
-                  color: "#c44536",
-                  borderColor: "#c44536",
-                }}
-              >
-                削除
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+  const applyPreset = (presetIndex: number) => {
+    const p = CARD_PRESETS[presetIndex];
+    setEditForm(prev => ({ ...prev, closing_day: p.close, payment_day: p.pay }));
+  };
 
-      <button
-        type="button"
-        onClick={() => handleAddRow(type)}
-        className="btn-secondary"
-        style={{ marginTop: 12, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
-      >
-        ＋ 行を追加する
-      </button>
-    </div>
-  );
-
-  const renderCardTable = () => (
-    <div className="app-card" style={{ marginBottom: 16 }}>
-      <h2>【カード】</h2>
-      {/* Desktop Table */}
-      <div className="table-wrapper desktop-table-view">
-        <table className="table-basic" style={{ minWidth: "600px" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>名称</th>
-              <th style={{ textAlign: "left" }}>内訳キー（任意）</th>
-              <th style={{ textAlign: "right", width: "80px" }}>締め日</th>
-              <th style={{ textAlign: "right", width: "80px" }}>支払日(翌月)</th>
-              <th style={{ textAlign: "center", width: "80px" }}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cardAccounts.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  <input
-                    type="text"
-                    value={a.name}
-                    onChange={handleNameChange("card", a.id)}
-                    className="form-input"
-                    placeholder="カード名称"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={a.paymentKey ?? ""}
-                    onChange={handleCardPaymentKeyChange(a.id)}
-                    className="form-input"
-                    placeholder="例：セゾンカード"
-                    style={{ fontSize: "13px" }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={a.closingDay ?? ""}
-                    onChange={handleCardNumberChange(a.id, "closingDay")}
-                    className="form-input"
-                    style={{ textAlign: "right" }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={a.paymentDay ?? ""}
-                    onChange={handleCardNumberChange(a.id, "paymentDay")}
-                    className="form-input"
-                    style={{ textAlign: "right" }}
-                  />
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow("card", a.id)}
-                    className="btn-secondary"
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "12px",
-                      minHeight: "auto",
-                      backgroundColor: "#fff5f3",
-                      color: "#c44536",
-                      borderColor: "#c44536",
-                    }}
-                  >
-                    削除
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="mobile-card-view">
-        {cardAccounts.map((a) => (
-          <div key={a.id} className="list-card-item">
-            <div className="list-card-row">
-              <span className="list-card-label" style={{ width: "40px" }}>名称</span>
-              <input
-                type="text"
-                value={a.name}
-                onChange={handleNameChange("card", a.id)}
-                className="form-input"
-                placeholder="カード名称"
-                style={{ flex: 1, padding: "8px" }}
-              />
-            </div>
-            <div className="list-card-row" style={{ marginTop: 8 }}>
-              <span className="list-card-label" style={{ width: "65px" }}>内訳キー</span>
-              <input
-                type="text"
-                value={a.paymentKey ?? ""}
-                onChange={handleCardPaymentKeyChange(a.id)}
-                className="form-input"
-                placeholder="例：セゾンカード"
-                style={{ flex: 1, padding: "8px", fontSize: "13px" }}
-              />
-            </div>
-
-            <div className="grid-container" style={{ gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
-              <div>
-                <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>締め日</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={a.closingDay ?? ""}
-                  onChange={handleCardNumberChange(a.id, "closingDay")}
-                  className="form-input"
-                  style={{ textAlign: "right", padding: "8px" }}
-                />
-              </div>
-              <div>
-                <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>支払い日</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={a.paymentDay ?? ""}
-                  onChange={handleCardNumberChange(a.id, "paymentDay")}
-                  className="form-input"
-                  style={{ textAlign: "right", padding: "8px" }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, textAlign: "right", paddingTop: 8, borderTop: "1px dashed #eee" }}>
-              <button
-                type="button"
-                onClick={() => handleRemoveRow("card", a.id)}
-                className="btn-secondary"
-                style={{
-                  padding: "6px 16px",
-                  backgroundColor: "#fff5f3",
-                  color: "#c44536",
-                  borderColor: "#c44536",
-                }}
-              >
-                削除
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => handleAddRow("card")}
-        className="btn-secondary"
-        style={{ marginTop: 12, fontSize: "13px", padding: "6px 12px", minHeight: "36px" }}
-      >
-        ＋ 行を追加する
-      </button>
-    </div>
-  );
+  if (loading) return <div className="p-4">Loading...</div>;
 
   return (
-    <div className="page-container">
-      <h1>残高設定（現金・口座・QR・カードなど）</h1>
-      <p style={{ marginBottom: 16 }}>
-        普段使う銀行口座・財布・QR決済・クレジットカードの種類を登録します。
-        <br />
-        ここで登録した名称が、入力画面の「支払い方法」などで選べるようになります。
-        <br />
-        残高そのものは、入力した明細（収入・支出）から自動で計算されます。
+    <div className="page-container" style={{ paddingBottom: 80 }}>
+      <h1>支払い方法（カード・口座）設定</h1>
+      <p style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
+        現金、銀行口座、クレジットカードの設定を行います。<br />
+        特にカードは「締め日・支払日」を設定することで、資金繰り予測に反映されます。
       </p>
 
-      {renderSimpleTable("bank", bankAccounts, "【銀行口座】")}
-      {renderSimpleTable("wallet", walletAccounts, "【財布】")}
-      {renderSimpleTable("qr", qrAccounts, "【QR】")}
-      {renderCardTable()}
+      {/* Assets Section */}
+      <div className="app-card" style={{ marginBottom: "24px" }}>
+        <h2 style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>💰 支払い元 (銀行/財布/Pay)</span>
+        </h2>
 
-      <div style={{ marginTop: 24, paddingBottom: 40 }}>
-        <button
-          type="button"
-          onClick={handleSave}
-          className="btn-primary"
-          style={{ width: "100%", maxWidth: "300px" }}
-        >
-          すべて保存する
-        </button>
+        <div className="list-container">
+          {assets.map(acc => (
+            <div key={acc.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #eee" }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: "center" }}>
+                {acc.type === "bank" ? "🏦" : acc.type === "cash" ? "👛" : "📱"}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{acc.name}</div>
+                <div style={{ fontSize: 11, color: "#888" }}>{acc.type.toUpperCase()}</div>
+              </div>
+              <button onClick={() => startEdit(acc)} style={{ fontSize: 12, padding: "4px 8px", background: "#f0f0f0", borderRadius: "4px", border: "none" }}>設定</button>
+            </div>
+          ))}
+          {assets.length === 0 && <p style={{ fontSize: 12, color: "#999", padding: 10 }}>登録なし</p>}
+        </div>
+
+        <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+          <button onClick={() => handleAddAccount("bank")} className="btn-secondary" style={{ fontSize: 12 }}>+ 銀行追加</button>
+          <button onClick={() => handleAddAccount("cash")} className="btn-secondary" style={{ fontSize: 12 }}>+ 現金/財布追加</button>
+        </div>
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 14 }}>
-        <a href="/settings">◀ 設定一覧に戻る</a>
+      {/* Liabilities Section */}
+      <div className="app-card">
+        <h2 style={{ display: "flex", justifyContent: "space-between", color: "#c44536" }}>
+          <span>💳 クレジットカード</span>
+        </h2>
+        <p style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>
+          カード払いを選択した際、ここで設定した締め日・支払日に基づいて引き落とし予定が作成されます。
+        </p>
+
+        <div className="list-container">
+          {liabilities.map(acc => (
+            <div key={acc.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #eee" }}>
+              <div style={{ fontSize: 24, width: 40, textAlign: "center" }}>💳</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{acc.name}</div>
+                <div style={{ fontSize: 11, color: "#c44536" }}>
+                  {/* Card date settings status */}
+                  {(acc.closing_day === undefined || acc.payment_day === undefined || acc.closing_day === null) ? (
+                    <span style={{ fontWeight: "bold", background: "#ffeeba", padding: "2px 4px", borderRadius: 4 }}>⚠️ 日付未設定</span>
+                  ) : (
+                    <span>{acc.closing_day === 99 ? "末" : acc.closing_day}日締 / {acc.payment_day}日払</span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => startEdit(acc)} style={{ fontSize: 12, padding: "4px 8px", background: "#f0f0f0", borderRadius: "4px", border: "none" }}>設定</button>
+            </div>
+          ))}
+          {liabilities.length === 0 && <p style={{ fontSize: 12, color: "#999", padding: 10 }}>登録なし</p>}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => handleAddAccount("card")} className="btn-secondary" style={{ fontSize: 12 }}>+ カード追加</button>
+        </div>
       </div>
+
+      <div style={{ marginTop: 24, textAlign: "center" }}>
+        <Link href="/settings" style={{ textDecoration: "underline", color: "#666" }}>設定トップへ戻る</Link>
+      </div>
+
+      {/* Edit Modal / Sheet */}
+      {(editingId || editForm.id) && (
+        <div className="modal-overlay" style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 1000 }}>
+          <div className="app-card" style={{ width: "90%", maxWidth: "400px", margin: 0 }}>
+            <h3>{editingId === "new" ? "新規追加" : "設定の編集"}</h3>
+
+            <div className="form-group">
+              <label>名称</label>
+              <input type="text" className="form-input" value={editForm.name || ""} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder="例: メインバンク / 楽天カード" />
+            </div>
+
+            {editForm.type === "card" && (
+              <div style={{ background: "#fff5f5", padding: "12px", borderRadius: "8px", margin: "12px 0" }}>
+                <label style={{ fontWeight: "bold", display: "block", marginBottom: 8, color: "#c44536" }}>締め日・支払日 (必須)</label>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12 }}>プリセットから選択</label>
+                  <select className="form-select" onChange={e => applyPreset(Number(e.target.value))}>
+                    <option value="">-- 選択してください --</option>
+                    {CARD_PRESETS.map((p, idx) => (
+                      <option key={idx} value={idx}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12 }}>締め日</label>
+                    <input type="number" className="form-input" value={editForm.closing_day || ""} onChange={e => setEditForm({ ...editForm, closing_day: Number(e.target.value) })} placeholder="99=末" />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12 }}>支払日</label>
+                    <input type="number" className="form-input" value={editForm.payment_day || ""} onChange={e => setEditForm({ ...editForm, payment_day: Number(e.target.value) })} />
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, color: "#666", marginTop: 4 }}>※ 末日は 99 と入力してください</p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+              {editingId !== "new" && (
+                <button onClick={() => handleDelete(editingId!)} style={{ color: "red", border: "none", background: "none", marginRight: "auto" }}>削除</button>
+              )}
+              <button onClick={() => { setEditingId(null); setEditForm({}); }} className="btn-secondary">キャンセル</button>
+              <button onClick={saveEdit} disabled={isSaving} className="btn-primary">{isSaving ? "保存中..." : "保存"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-export default function ProtectedAccountSettingsPage() {
-  return <AccountSettingsInnerPage />;
 }

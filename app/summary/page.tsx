@@ -45,7 +45,7 @@ export default function SummaryPage() {
 
   const hasCardData = cardKeys.length > 0;
 
-  const chartData: any = {
+  const chartData = {
     labels,
     datasets: cardKeys.map((key, index) => ({
       label: formatPaymentLabel(key),
@@ -60,7 +60,7 @@ export default function SummaryPage() {
     })),
   };
 
-  const chartOptions: any = {
+  const chartOptions = {
     responsive: true,
     plugins: {
       legend: {

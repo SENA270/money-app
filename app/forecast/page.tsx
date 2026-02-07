@@ -12,7 +12,7 @@ import {
   Legend,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { useForecast } from "../hooks/useForecast";
+import { useForecast, ForecastEvent } from "../hooks/useForecast";
 
 ChartJS.register(
   CategoryScale,
@@ -24,13 +24,18 @@ ChartJS.register(
   Legend
 );
 
+import ForecastBillDetail from "../components/Forecast/ForecastBillDetail";
+import ForecastBalanceDetail from "../components/Forecast/ForecastBalanceDetail";
+
 export default function ForecastPage() {
-  const { events, balanceHistory, startBalance, loading } = useForecast(6);
+  const { events, balanceHistory, startBalance, assetBreakdown, loading } = useForecast(6);
   const [paidBills, setPaidBills] = useState<{ [key: string]: boolean }>({});
+  const [selectedBill, setSelectedBill] = useState<ForecastEvent | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("paidBills");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setPaidBills(JSON.parse(raw));
     }
   }, []);
@@ -72,6 +77,12 @@ export default function ForecastPage() {
   const next2Months = new Date(today.getFullYear(), today.getMonth() + 2, 0);
   const upComingBills = events.filter(e => e.amount < 0 && e.date <= next2Months && e.date >= today);
 
+  const handleEventClick = (ev: ForecastEvent) => {
+    if (ev.type === "card_debit" && ev.sourceTransactions) {
+      setSelectedBill(ev);
+    }
+  };
+
   return (
     <div className="page-container" style={{ paddingBottom: 100 }}>
       <h1>資金繰り予測</h1>
@@ -85,7 +96,11 @@ export default function ForecastPage() {
         <>
           <div className="app-card" style={{ marginBottom: 24 }}>
             <h2>残高推移 (6ヶ月)</h2>
-            <p style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>現在の資産: ¥{startBalance.toLocaleString()}</p>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, color: "#999", margin: 0 }}>現在の資産: ¥{startBalance.toLocaleString()}</p>
+              <ForecastBalanceDetail totalBalance={startBalance} breakdown={assetBreakdown} />
+            </div>
+
             <div style={{ position: "relative", width: "100%", maxWidth: "100%", height: "220px", overflow: "hidden" }}>
               <Line data={chartData} options={chartOptions} />
             </div>
@@ -109,10 +124,22 @@ export default function ForecastPage() {
                   <tbody>
                     {upComingBills.map(ev => {
                       const isPaid = paidBills[ev.id];
+                      const isCard = ev.type === "card_debit";
                       return (
                         <tr key={ev.id}>
                           <td>{ev.dateStr}</td>
-                          <td>{ev.label}</td>
+                          <td>
+                            {isCard ? (
+                              <span
+                                onClick={() => handleEventClick(ev)}
+                                style={{ color: "#007bff", cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted" }}
+                              >
+                                {ev.label} ℹ️
+                              </span>
+                            ) : (
+                              ev.label
+                            )}
+                          </td>
                           <td style={{ textAlign: "right" }}>¥{Math.abs(ev.amount).toLocaleString()}</td>
                           <td style={{ textAlign: "center" }}>
                             <button
@@ -141,11 +168,18 @@ export default function ForecastPage() {
             <div className="mobile-card-view">
               {upComingBills.map(ev => {
                 const isPaid = paidBills[ev.id];
+                const isCard = ev.type === "card_debit";
                 return (
                   <div key={ev.id} className="list-card-item">
                     <div className="list-card-row">
                       <span className="list-card-label">{ev.dateStr}</span>
-                      <span className="list-card-value">{ev.label}</span>
+                      <span className="list-card-value">
+                        {isCard ? (
+                          <span onClick={() => handleEventClick(ev)} style={{ color: "#007bff", textDecoration: "underline" }}>
+                            {ev.label} ℹ️
+                          </span>
+                        ) : ev.label}
+                      </span>
                     </div>
                     <div className="list-card-row">
                       <span className="list-card-label">金額</span>
@@ -174,6 +208,17 @@ export default function ForecastPage() {
             </div>
           </div>
         </>
+      )}
+
+      {selectedBill && (
+        <ForecastBillDetail
+          isOpen={!!selectedBill}
+          onClose={() => setSelectedBill(null)}
+          cardName={selectedBill.label}
+          totalAmount={Math.abs(selectedBill.amount)}
+          transactions={selectedBill.sourceTransactions || []}
+          billDate={selectedBill.dateStr}
+        />
       )}
     </div>
   );

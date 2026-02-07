@@ -19,7 +19,7 @@ type LoanItem = {
 
 type AppSettings = {
   loans?: LoanItem[];
-  [key: string]: any; // 他の設定も壊さないため
+  [key: string]: unknown; // 他の設定も壊さないため
 };
 
 function createId() {
@@ -40,7 +40,7 @@ export default function LoanSettingsPage() {
       const parsed = JSON.parse(raw) as AppSettings;
       const stored = parsed.loans || [];
 
-      const normalized: LoanItem[] = stored.map((item: any) => ({
+      const normalized: LoanItem[] = stored.map((item) => ({
         id: item.id || createId(),
         name: item.name ?? "",
         amountPerPayment: Number(item.amountPerPayment ?? 0),

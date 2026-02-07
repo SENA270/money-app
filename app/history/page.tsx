@@ -1,413 +1,260 @@
 // app/history/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { Transaction } from "../types";
+import { useCategories } from "../hooks/useCategories";
+import { usePaymentMethods } from "../hooks/usePaymentMethods";
+import TransactionQuickForm from "../components/Input/TransactionQuickForm";
+import { ChevronLeft, ChevronRight, Search, Edit2, Trash2 } from "lucide-react";
 
-type TransactionType = "expense" | "income" | "card_payment";
-
-// ...
-
-// Helper for type label and color
-function getTypeLabel(type: TransactionType) {
-  if (type === "income") return "収入";
-  if (type === "card_payment") return "振替";
-  return "支出";
-}
-
-function getTypeColor(type: TransactionType) {
-  if (type === "income") return "#2f7d32";
-  if (type === "card_payment") return "#555"; // Gray for transfer
-  return "#c44536";
-}
-
-function getTypeBg(type: TransactionType) {
-  if (type === "income") return "#edf7ec";
-  if (type === "card_payment") return "#f5f5f5";
-  return "#fff5f3";
-}
-
-function getTypeBorder(type: TransactionType) {
-  if (type === "income") return "#4f8f3a";
-  if (type === "card_payment") return "#999";
-  return "#c44536";
-}
-
-// ... inside HistoryContent ...
-
-// In Table View:
-// <td>{getTypeLabel(t.type)}</td>
-// <td style={{ color: getTypeColor(t.type), fontWeight: 600 }}>
-//   {t.type === "expense" ? "-" : t.type === "card_payment" ? "-> " : "+"}
-//   ¥{t.amount.toLocaleString()}
-// </td>
-
-// In Mobile Card View:
-// <span style={{ backgroundColor: getTypeBg(t.type), color: getTypeColor(t.type), borderColor: getTypeBorder(t.type) ... }}>
-//   {getTypeLabel(t.type)}
-// </span>
-// <span style={{ color: getTypeColor(t.type) ... }}>
-//   ¥{t.amount.toLocaleString()}
-// </span>
-
-type Transaction = {
-  id: string;
-  user_id: string;
-  date: string; // "2025-11-21"
-  amount: number;
-  type: TransactionType;
-  category: string;
-  payment: string;
-  memo: string;
-  created_at?: string | null;
-};
-
-// "2025-11-26" -> "2025-11"
-function toYearMonth(dateStr: string): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function HistoryContent() {
+export default function HistoryPage() {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Supabase から全件読み込み
-  useEffect(() => {
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // Helpers for names
+  const { categories } = useCategories();
+  const { paymentMethods } = usePaymentMethods();
+
+  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || "未分類";
+  const getPaymentName = (id: string) => paymentMethods.find(p => p.id === id)?.name || "不明";
+
+  // Fetch Logic
+  const fetchTransactions = async () => {
     try {
-      const fetchTx = async () => {
-        setLoading(true);
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) {
-          console.error("getUser error", userError);
-          setLoading(false);
-          return;
-        }
-        const user = userData?.user;
-        if (!user) {
-          setLoading(false);
-          return;
-        }
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        const { data, error } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false });
+      // Adjust date range for timezone safety (fetch a bit wider and filter in memory if strictly needed, or trust ISO)
+      // Display month is `year`-`month`.
+      const start = new Date(year, month - 1, 1).toISOString();
+      const end = new Date(year, month, 1).toISOString();
 
-        if (error) {
-          console.error("transactions fetch error", error);
-          setLoading(false);
-          return;
-        }
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", start)
+        .lt("date", end)
+        .order("date", { ascending: false });
 
-        const list = (data || []) as Transaction[];
-        setTransactions(list);
-
-        if (list.length > 0) {
-          const newestMonth = toYearMonth(list[0].date);
-          setSelectedMonth(newestMonth);
-        }
-        setLoading(false);
-      };
-
-      fetchTx();
+      if (error) throw error;
+      setTransactions(data || []);
     } catch (e) {
-      console.error("取引データの読み込みに失敗しました", e);
+      console.error(e);
+      alert("読み込みエラー");
+    } finally {
       setLoading(false);
     }
-  }, []);
-
-  // ====== 月一覧（"2025-11" のような文字列） ======
-  const months = useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach((t) => {
-      const ym = toYearMonth(t.date);
-      if (ym) set.add(ym);
-    });
-
-    return Array.from(set).sort((a, b) => {
-      // 新しい月が左に来るように降順
-      return a < b ? 1 : -1;
-    });
-  }, [transactions]);
-
-  // ====== 選択中の月の明細だけを、日付 & 時刻の新しい順に並べる ======
-  const visibleTransactions = useMemo(() => {
-    // ベース配列を作る
-    const base = selectedMonth
-      ? transactions.filter((t) => toYearMonth(t.date) === selectedMonth)
-      : [...transactions];
-
-    // 日付の新しい順 → 同じ日なら created_at の新しい順
-    return [...base].sort((a, b) => {
-      const ta = new Date(a.date).getTime();
-      const tb = new Date(b.date).getTime();
-      if (tb !== ta) return tb - ta;
-
-      const ca = a.created_at ? new Date(a.created_at).getTime() : ta;
-      const cb = b.created_at ? new Date(b.created_at).getTime() : tb;
-      return cb - ca;
-    });
-  }, [transactions, selectedMonth]);
-
-  // 削除処理（1件）
-  const handleDelete = async (id: string) => {
-    const ok = window.confirm("この明細を削除しますか？");
-    if (!ok) return;
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData?.user) {
-      console.error("ユーザー取得に失敗しました", userError);
-      return;
-    }
-
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", userData.user.id);
-
-    if (error) {
-      console.error("削除に失敗しました", error);
-      alert("削除に失敗しました。時間をおいて再度お試しください。");
-      return;
-    }
-
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const totalIncome = visibleTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
+  useEffect(() => {
+    fetchTransactions();
+  }, [year, month]);
 
-  const totalExpense = visibleTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+  // Handlers
+  const handlePrevMonth = () => {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  };
+  const handleNextMonth = () => {
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("この取引を削除しますか？")) return;
+    try {
+      const { error } = await supabase.from("transactions").delete().eq("id", id);
+      if (error) throw error;
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    } catch (e) {
+      alert("削除に失敗しました: " + (e as Error).message);
+    }
+  };
+
+  const handleEditSuccess = () => {
+    setEditingTransaction(null);
+    fetchTransactions(); // Refresh list
+  };
+
+  // Filter
+  const filtered = transactions.filter(t =>
+    (t.memo || "").includes(searchQuery) ||
+    getCategoryName(t.category_id).includes(searchQuery) ||
+    String(t.amount).includes(searchQuery)
+  );
+
+  // Group by Date
+  const grouped: { [date: string]: Transaction[] } = {};
+  filtered.forEach(t => {
+    const d = t.date; // already YYYY-MM-DD string from specific code usually, or ISO
+    // If ISO, extract YYYY-MM-DD
+    const dateKey = d.substring(0, 10);
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(t);
+  });
+
+  // Sort dates desc
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="page-container">
-      <h1>明細一覧（月ごと）</h1>
-      <p style={{ marginBottom: 16 }}>
-        月ごとに明細を表示します。不要な行はここから削除・編集できます。
-      </p>
+    <div className="page-container" style={{ paddingBottom: 40 }}>
 
-      {loading && <p>読み込み中...</p>}
+      {/* Header & Controls */}
+      <div className="app-card" style={{ padding: "16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <button onClick={handlePrevMonth} className="btn-secondary" style={{ width: 44, height: 44, padding: 0 }}>
+            <ChevronLeft size={24} />
+          </button>
+          <h1 style={{ fontSize: 20, margin: 0, color: "#3b2a1a" }}>{year}年{month}月</h1>
+          <button onClick={handleNextMonth} className="btn-secondary" style={{ width: 44, height: 44, padding: 0 }}>
+            <ChevronRight size={24} />
+          </button>
+        </div>
 
-      {/* 月選択ボタン */}
-      {!loading && months.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <span style={{ marginRight: 8 }}>表示する月：</span>
-          {months.map((ym) => {
-            const [y, m] = ym.split("-");
-            const isActive = ym === selectedMonth;
-            return (
-              <button
-                key={ym}
-                type="button"
-                onClick={() => setSelectedMonth(ym)}
-                style={{
-                  marginRight: 8,
-                  marginBottom: 8,
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  border: isActive ? "1px solid #8a6b3f" : "1px solid #ccc",
-                  backgroundColor: isActive ? "#fff0d6" : "#fff",
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-              >
-                {y}年{Number(m)}月
-              </button>
-            );
-          })}
+        <div style={{ position: "relative" }}>
+          <Search size={20} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+          <input
+            type="text"
+            placeholder="検索 (メモ・カテゴリ・金額)"
+            className="form-input"
+            style={{ paddingLeft: 40 }}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <p style={{ textAlign: "center", color: "#888", marginTop: 40 }}>読み込み中...</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ textAlign: "center", color: "#888", marginTop: 40 }}>取引履歴はありません</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {sortedDates.map(date => (
+            <div key={date} className="app-card" style={{ padding: 0, overflow: "hidden" }}>
+              {/* Date Header */}
+              <div style={{
+                background: "#fdf8ee",
+                padding: "8px 16px",
+                borderBottom: "1px solid #eee8dc",
+                fontWeight: "bold",
+                color: "#5d4330",
+                fontSize: 14
+              }}>
+                {new Date(date).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" })}
+              </div>
+
+              {/* Transactions in this date */}
+              <div>
+                {grouped[date].map((tx, idx) => (
+                  <div key={tx.id} style={{
+                    padding: "12px 16px",
+                    borderBottom: idx === grouped[date].length - 1 ? "none" : "1px solid #f0f0f0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <div style={{ flex: 1, marginRight: 12 }}>
+                      {/* Top Row: Category & Memo */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{
+                          fontSize: 11,
+                          background: "#eee",
+                          color: "#666",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          whiteSpace: "nowrap"
+                        }}>
+                          {getCategoryName(tx.category_id)}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {tx.memo || "（メモなし）"}
+                        </span>
+                      </div>
+                      {/* Bottom Row: Payment Method */}
+                      <div style={{ fontSize: 11, color: "#999" }}>
+                        {getPaymentName(tx.payment_method_id)}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <div style={{
+                        fontWeight: 700, fontSize: 16,
+                        color: tx.type === 'income' ? "#2f855a" : "#c53030"
+                      }}>
+                        {tx.type === 'income' ? "+" : "¥"}{Number(tx.amount).toLocaleString()}
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                        <button
+                          onClick={() => setEditingTransaction(tx)}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: "#8c7b6c", padding: 4
+                          }}
+                          aria-label="編集"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: "#c53030", padding: 4
+                          }}
+                          aria-label="削除"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="app-card" style={{ marginBottom: 16 }}>
-        <h2>集計（{selectedMonth || "全期間"}）</h2>
-        <p>収入合計：¥{totalIncome.toLocaleString()}</p>
-        <p>支出合計：¥{totalExpense.toLocaleString()}</p>
-        <p>差額：¥{(totalIncome - totalExpense).toLocaleString()}</p>
-      </div>
-
-      <div className="app-card">
-        <h2>明細一覧</h2>
-
-        {visibleTransactions.length === 0 ? (
-          <p>この月の明細はありません。</p>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="table-wrapper desktop-table-view">
-              <table
-                className="table-basic"
-                style={{
-                  minWidth: "600px",
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>日付</th>
-                    <th style={{ textAlign: "left" }}>種類</th>
-                    <th style={{ textAlign: "left" }}>カテゴリ</th>
-                    <th style={{ textAlign: "right" }}>金額</th>
-                    <th style={{ textAlign: "left" }}>支払い方法</th>
-                    <th style={{ textAlign: "left" }}>メモ</th>
-                    <th style={{ textAlign: "center" }}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleTransactions.map((t) => (
-                    <tr key={t.id}>
-                      <td>{formatDate(t.date)}</td>
-                      <td>{t.type === "income" ? "収入" : t.type === "card_payment" ? "振替" : "支出"}</td>
-                      <td>{t.category}</td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {t.type === "expense" ? "-" : t.type === "card_payment" ? "→" : "+"}
-                        ¥{t.amount.toLocaleString()}
-                      </td>
-                      <td>{t.payment}</td>
-                      <td>{t.memo}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <div style={{ display: "inline-flex", gap: 8 }}>
-                          <Link
-                            href={`/input?id=${t.id}`}
-                            className="btn-link"
-                            style={{
-                              textDecoration: "none",
-                              padding: "6px 12px", // Larger touch target
-                            }}
-                          >
-                            編集
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(t.id)}
-                            className="btn-link"
-                            style={{
-                              borderColor: "#c44536",
-                              color: "#c44536",
-                              backgroundColor: "#fff5f3",
-                              padding: "6px 12px", // Larger touch target
-                            }}
-                          >
-                            削除
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Edit Modal (Keeping simple fixed overly) */}
+      {editingTransaction && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.5)", zIndex: 3000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16
+        }}>
+          <div style={{ background: "#fff", padding: 20, borderRadius: 16, width: "100%", maxWidth: 400, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 18 }}>取引の編集</h3>
+              <button onClick={() => setEditingTransaction(null)} style={{ border: "none", background: "#f5f5f5", width: 32, height: 32, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>×</button>
             </div>
+            <TransactionQuickForm
+              onSuccess={handleEditSuccess}
+              initialValues={{
+                id: editingTransaction.id,
+                amount: String(editingTransaction.amount),
+                date: editingTransaction.date,
+                categoryId: editingTransaction.category_id,
+                paymentMethodId: editingTransaction.payment_method_id,
+                type: editingTransaction.type,
+                memo: editingTransaction.memo
+              }}
+            />
+          </div>
+        </div>
+      )}
 
-            {/* Mobile Card View */}
-            <div className="mobile-card-view">
-              {visibleTransactions.map((t) => (
-                <div key={t.id} className="list-card-item">
-                  <div className="list-card-row">
-                    <span className="list-card-label">{formatDate(t.date)}</span>
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        padding: "2px 8px",
-                        borderRadius: "4px",
-                        backgroundColor: t.type === "expense" ? "#fff5f3" : t.type === "card_payment" ? "#f5f5f5" : "#edf7ec",
-                        color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32",
-                        border: "1px solid",
-                        borderColor: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#ccc" : "#4f8f3a"
-                      }}
-                    >
-                      {t.type === "income" ? "収入" : t.type === "card_payment" ? "振替" : "支出"}
-                    </span>
-                  </div>
-                  <div className="list-card-row">
-                    <span className="list-card-value" style={{ fontSize: "15px" }}>{t.category}</span>
-                    <span
-                      className="list-card-value"
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: t.type === "expense" ? "#c44536" : t.type === "card_payment" ? "#555" : "#2f7d32"
-                      }}
-                    >
-                      ¥{t.amount.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="list-card-row">
-                    <span className="list-card-label">支払: {t.payment}</span>
-                  </div>
-                  {t.memo && (
-                    <div className="list-card-row" style={{ marginTop: "4px" }}>
-                      <span className="list-card-label" style={{ fontSize: "11px" }}>{t.memo}</span>
-                    </div>
-                  )}
-                  <div className="list-card-row" style={{ marginTop: "12px", paddingTop: "8px", borderTop: "1px dashed #eee" }}>
-                    <div style={{ display: "flex", gap: "12px", width: "100%", justifyContent: "flex-end" }}>
-                      <Link
-                        href={`/input?id=${t.id}`}
-                        className="btn-link"
-                        style={{
-                          textDecoration: "none",
-                          padding: "6px 16px",
-                          textAlign: "center"
-                        }}
-                      >
-                        編集
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(t.id)}
-                        className="btn-link"
-                        style={{
-                          borderColor: "#c44536",
-                          color: "#c44536",
-                          backgroundColor: "#fff5f3",
-                          padding: "6px 16px",
-                        }}
-                      >
-                        削除
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div style={{ marginTop: 16, fontSize: 14 }}>
-        <Link href="/">← ホームに戻る</Link>
-      </div>
     </div>
   );
-}
-
-export default function HistoryPage() {
-  return <HistoryContent />;
 }

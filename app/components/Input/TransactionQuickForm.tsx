@@ -2,144 +2,169 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { saveTransaction, TransactionInput } from "../../lib/transaction/saveTransaction";
+import { saveTransaction } from "../../lib/transaction/saveTransaction";
 import { supabase } from "../../../lib/supabaseClient";
+import { useCategories } from "../../hooks/useCategories";
+import { usePaymentMethods } from "../../hooks/usePaymentMethods";
+import { getLoans, LoanWithStatus } from "../../lib/loans";
+import { ArrowRightLeft } from "lucide-react";
 
 type QuickFormProps = {
   onSuccess: () => void;
   initialValues?: {
+    id?: string;
     amount?: string;
     date?: string;
     category?: string;
+    categoryId?: string;
+    paymentMethodId?: string;
+    type?: "expense" | "income" | "repayment";
     memo?: string;
+    loanId?: string;
   };
 };
 
-type Category = {
-  id: string;
-  name: string;
-  type: "expense" | "income";
-};
-
-type Account = {
-  id: string;
-  name: string;
-  type: "bank" | "wallet" | "qr" | "card";
-};
+const LOAN_REPAYMENT_OPTION_VALUE = "__LOAN_REPAYMENT__";
+const ADD_NEW_VALUE = "__ADD_NEW__";
 
 export default function TransactionQuickForm({ onSuccess, initialValues }: QuickFormProps) {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get("mode");
-  const initialType = modeParam === "income" ? "income" : "expense"; // Default to expense if not specified
 
-  // UI State
+  // Initial type logic: default to expense unless income is specified. Repayment is now hidden under expense.
+  // If initialValues.type is repayment, we start in expense mode but with isRepaymentMode=true (handled below)
+  const initialType = (initialValues?.type === "income" || modeParam === "income") ? "income" : "expense";
+
+  const { categories, addCategory, loading: catLoading } = useCategories();
+  const { paymentMethods, addPaymentMethod, loading: payLoading } = usePaymentMethods();
+
   const [amount, setAmount] = useState(initialValues?.amount || "");
   const [type, setType] = useState<"expense" | "income">(initialType);
-  const [category, setCategory] = useState(initialValues?.category || "");
-  const [loading, setLoading] = useState(false);
+  const [categoryId, setCategoryId] = useState(initialValues?.categoryId || "");
+  const [paymentMethodId, setPaymentMethodId] = useState(initialValues?.paymentMethodId || "");
 
-  // Always Visible Details
+  // Repayment Mode State
+  const [isRepaymentMode, setIsRepaymentMode] = useState(initialValues?.type === "repayment");
+  const [loanId, setLoanId] = useState(initialValues?.loanId || "");
+  const [loans, setLoans] = useState<LoanWithStatus[]>([]);
+
+  const [loading, setLoading] = useState(false);
   const [date, setDate] = useState(initialValues?.date || new Date().toISOString().slice(0, 10));
   const [memo, setMemo] = useState(initialValues?.memo || "");
 
-  // Data
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-
-  // Selection
-  const [selectedAccount, setSelectedAccount] = useState("");
-
-  // Add Category State
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-
-  // Add Account State
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [newAccountName, setNewAccountName] = useState("");
-  const [newAccountType, setNewAccountType] = useState<"bank" | "wallet" | "qr" | "card">("wallet");
+  const [newAccountType, setNewAccountType] = useState<"bank" | "cash" | "card">("cash");
+  const [newAccountBalance, setNewAccountBalance] = useState("");
 
-  const ADD_NEW_VALUE = "__ADD_NEW__";
+  const visibleCategories = categories.filter(c => !c.is_archived);
 
-  // Load Data
+  // Initialize Defaults
   useEffect(() => {
-    const load = () => {
-      // 1. Categories
-      const catRaw = localStorage.getItem("categories");
-      let loadedCats: Category[] = [];
-      if (catRaw) {
-        loadedCats = JSON.parse(catRaw);
+    // Set default category if none selected (Only for Expense/Income)
+    if (!isRepaymentMode && !categoryId && visibleCategories.length > 0 && type === 'expense') {
+      if (initialValues?.categoryId) {
+        setCategoryId(initialValues.categoryId);
       } else {
-        // Fallback
-        loadedCats = [
-          { id: "1", name: "食費", type: "expense" },
-          { id: "2", name: "日用品", type: "expense" }
-        ];
+        setCategoryId(visibleCategories[0].id);
       }
-      setCategories(loadedCats);
+    }
 
-      if (!category) {
-        // Default category if empty
-        const defaults = loadedCats.filter(c => c.type === "expense");
-        if (defaults.length > 0) setCategory(defaults[0].name);
+    if (!paymentMethodId && paymentMethods.length > 0) {
+      if (initialValues?.paymentMethodId) {
+        setPaymentMethodId(initialValues.paymentMethodId);
+      } else {
+        const lastUsedId = localStorage.getItem("lastUsedPaymentMethodId");
+        if (lastUsedId && paymentMethods.find(p => p.id === lastUsedId)) {
+          setPaymentMethodId(lastUsedId);
+        } else {
+          const pref = paymentMethods.find(p => p.type === 'cash') || paymentMethods[0];
+          setPaymentMethodId(pref.id);
+        }
       }
+    }
+  }, [categories, paymentMethods, initialValues, categoryId, paymentMethodId, visibleCategories, type, isRepaymentMode]);
 
-      // 2. Accounts
-      const accRaw = localStorage.getItem("accounts");
-      let loadedAccs: Account[] = [];
-      if (accRaw) {
-        loadedAccs = JSON.parse(accRaw);
+  // Fetch Loans
+  useEffect(() => {
+    async function loadLoans() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const data = await getLoans(user.id);
+        const activeLoans = data.filter(l => l.status === 'active');
+        setLoans(activeLoans);
+        // Auto select first loan if in repayment mode
+        if (activeLoans.length > 0 && !loanId) {
+          setLoanId(activeLoans[0].id);
+        }
       }
+    }
+    loadLoans();
+  }, [isRepaymentMode]);
 
-      // Sort by Last Used
-      const lastUsed = localStorage.getItem("lastUsedAccountName");
-      if (lastUsed) {
-        loadedAccs.sort((a, b) => {
-          if (a.name === lastUsed) return -1;
-          if (b.name === lastUsed) return 1;
-          return 0;
-        });
-      }
-      setAccounts(loadedAccs);
-      if (loadedAccs.length > 0 && !selectedAccount) setSelectedAccount(loadedAccs[0].name);
-    };
-    load();
-  }, [category]); // Keeping dependency simple
+  // Handle Category Change
+  const handleCategoryChange = (val: string) => {
+    if (val === LOAN_REPAYMENT_OPTION_VALUE) {
+      setIsRepaymentMode(true);
+      setCategoryId(""); // Clear category ID as we use special mode
+      // Ensure loan selected
+      if (loans.length > 0 && !loanId) setLoanId(loans[0].id);
+    } else if (val === ADD_NEW_VALUE) {
+      setIsAddingCategory(true);
+    } else {
+      setIsRepaymentMode(false);
+      setCategoryId(val);
+    }
+  };
 
   const handleSave = async () => {
     if (!amount) return;
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount < 0) {
+      alert("金額を正しく入力してください");
+      return;
+    }
+
+    const finalType = isRepaymentMode ? 'repayment' : type;
+
+    // Validation
+    if (finalType === 'repayment') {
+      if (!loanId) {
+        alert("返済するローンを選択してください");
+        return;
+      }
+    } else {
+      if (!categoryId) {
+        alert("カテゴリを選択してください");
+        return;
+      }
+    }
+
+    if (!paymentMethodId) {
+      alert("支払い方法を選択してください");
+      return;
+    }
 
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Login required");
 
-      // Resolve Type Logic
-      let finalType: "expense" | "income" | "card_payment" = type;
-
-      // If Expense and Card selected -> card_payment
-      if (type === "expense") {
-        const acc = accounts.find(a => a.name === selectedAccount);
-        if (acc?.type === "card") {
-          finalType = "card_payment";
-        }
-      }
-
-      const input: TransactionInput = {
+      await saveTransaction({
+        id: initialValues?.id,
         user_id: user.id,
-        amount: Number(amount),
+        amount: numAmount,
         type: finalType,
-        category: category,
+        category_id: finalType === 'repayment' ? undefined : categoryId,
+        payment_method_id: paymentMethodId,
+        loan_id: finalType === 'repayment' ? loanId : undefined,
         date: date,
-        memo: memo,
-        paymentMethod: selectedAccount
-      };
+        memo: memo || (finalType === 'repayment' ? "返済" : ""),
+      });
 
-      await saveTransaction(input);
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("lastUsedAccountName", selectedAccount);
-      }
+      localStorage.setItem("lastUsedPaymentMethodId", paymentMethodId);
 
       setAmount("");
       setMemo("");
@@ -151,66 +176,55 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
     }
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategorySubmit = async () => {
     if (!newCategoryName.trim()) return;
-
-    const newCat: Category = {
-      id: `cat-${Date.now()}`,
-      name: newCategoryName,
-      type: type
-    };
-
-    const updated = [...categories, newCat];
-    setCategories(updated);
-    localStorage.setItem("categories", JSON.stringify(updated));
-
-    setCategory(newCategoryName);
-    setIsAddingCategory(false);
-    setNewCategoryName("");
+    try {
+      await addCategory(newCategoryName);
+      setIsAddingCategory(false);
+      setNewCategoryName("");
+    } catch (e) {
+      alert("追加に失敗しました");
+    }
   };
 
-  const handleAddAccount = () => {
+  const handleAddAccountSubmit = async () => {
     if (!newAccountName.trim()) return;
-
-    const newAcc: Account = {
-      id: `${newAccountType}-${Date.now()}`,
-      name: newAccountName,
-      type: newAccountType
-    };
-
-    const updated = [...accounts, newAcc];
-    setAccounts(updated);
-    localStorage.setItem("accounts", JSON.stringify(updated));
-
-    setSelectedAccount(newAccountName);
-    setIsAddingAccount(false);
-    setNewAccountName("");
+    try {
+      await addPaymentMethod({
+        name: newAccountName,
+        type: newAccountType,
+        balance: newAccountBalance ? Number(newAccountBalance) : 0
+      });
+      setIsAddingAccount(false);
+      setNewAccountName("");
+      setNewAccountBalance("");
+    } catch (e) {
+      alert("追加に失敗しました");
+    }
   };
 
-  const visibleCategories = categories.filter(c => c.type === type);
+  if (catLoading || payLoading) return <div>Loading...</div>;
 
   return (
     <div className="app-card" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-      {/* Header: Type Switcher & Amount Compact */}
+      {/* Header: Type Switcher & Amount */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        {/* Type Switcher (Compact Left) */}
         <div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "2px", width: "120px" }}>
           <button
-            onClick={() => setType("expense")}
-            style={{ flex: 1, padding: "6px", borderRadius: "6px", background: type === "expense" ? "#fff" : "transparent", fontWeight: type === "expense" ? 700 : 400, border: "none", fontSize: "12px" }}
+            onClick={() => { setType("expense"); setIsRepaymentMode(false); }}
+            style={{ flex: 1, padding: "6px", borderRadius: "6px", background: type === "expense" ? "#fff" : "transparent", fontWeight: type === "expense" ? 700 : 400, border: "none", fontSize: "12px", boxShadow: type === "expense" ? "0 1px 2px rgba(0,0,0,0.1)" : "none" }}
           >
             支出
           </button>
           <button
-            onClick={() => setType("income")}
-            style={{ flex: 1, padding: "6px", borderRadius: "6px", background: type === "income" ? "#fff" : "transparent", fontWeight: type === "income" ? 700 : 400, border: "none", fontSize: "12px" }}
+            onClick={() => { setType("income"); setIsRepaymentMode(false); }}
+            style={{ flex: 1, padding: "6px", borderRadius: "6px", background: type === "income" ? "#fff" : "transparent", fontWeight: type === "income" ? 700 : 400, border: "none", fontSize: "12px", boxShadow: type === "income" ? "0 1px 2px rgba(0,0,0,0.1)" : "none" }}
           >
             収入
           </button>
         </div>
 
-        {/* Amount (Compact Right) */}
         <div style={{ flex: 1, position: "relative" }}>
           <input
             type="number"
@@ -218,54 +232,78 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
             onChange={e => setAmount(e.target.value)}
             placeholder="0"
             style={{
-              width: "100%", fontSize: "32px", fontWeight: 700, padding: "0", border: "none", borderBottom: "2px solid #3b2a1a",
+              width: "100%", fontSize: "32px", fontWeight: 700, padding: "0 24px 0 0", border: "none", borderBottom: "2px solid #3b2a1a",
               textAlign: "right", outline: "none", background: "transparent", color: "#3b2a1a"
             }}
             inputMode="decimal"
             autoFocus
           />
-          <span style={{ position: "absolute", right: 0, bottom: -18, fontSize: "11px", color: "#888" }}>円</span>
+          <span style={{ position: "absolute", right: 0, bottom: 8, fontSize: "12px", color: "#888" }}>円</span>
         </div>
       </div>
 
-      {/* Row: Category & Payment (50/50 Split) */}
+      {/* Row: Category/Loan & Payment */}
       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
 
-        {/* Category */}
+        {/* Category Selector */}
         <div style={{ flex: 1 }}>
-          <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "4px" }}>カテゴリ</label>
+          <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "4px" }}>
+            カテゴリ
+          </label>
+
           {!isAddingCategory ? (
             <select
-              value={category}
-              onChange={e => {
-                if (e.target.value === ADD_NEW_VALUE) {
-                  setIsAddingCategory(true);
-                } else {
-                  setCategory(e.target.value);
-                }
-              }}
+              value={isRepaymentMode ? LOAN_REPAYMENT_OPTION_VALUE : categoryId}
+              onChange={e => handleCategoryChange(e.target.value)}
               className="form-select"
+              disabled={type === 'income'}
               style={{ width: "100%", padding: "8px", fontSize: "14px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px" }}
             >
               {visibleCategories.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-              <option value={ADD_NEW_VALUE} style={{ color: "#007bff", fontWeight: "bold" }}>+ 追加...</option>
+              {/* Special Option for Debt Repayment (Only in Expense) */}
+              {type === 'expense' && (
+                <option value={LOAN_REPAYMENT_OPTION_VALUE} style={{ fontWeight: "bold", color: "#b58b5a" }}>
+                  💳 ローン返済
+                </option>
+              )}
+              <option value={ADD_NEW_VALUE} style={{ color: "#007bff" }}>+ カテゴリ追加...</option>
             </select>
           ) : (
-            <div className="animate-fade-in" style={{ padding: "4px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px" }}>
+            <div className="animate-fade-in" style={{ padding: "8px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px" }}>
               <input
                 type="text"
                 value={newCategoryName}
                 onChange={e => setNewCategoryName(e.target.value)}
-                placeholder="名称"
-                style={{ width: "100%", border: "none", borderBottom: "1px solid #eee", fontSize: "13px", padding: "4px", marginBottom: "4px" }}
+                placeholder="カテゴリ名"
+                style={{ width: "100%", border: "none", borderBottom: "1px solid #eee", fontSize: "13px", padding: "4px", marginBottom: "8px" }}
                 autoFocus
               />
               <div style={{ display: "flex", gap: "4px" }}>
-                <button onClick={handleAddCategory} className="btn-primary" style={{ flex: 1, padding: "4px", fontSize: "11px" }}>OK</button>
+                <button onClick={handleAddCategorySubmit} className="btn-primary" style={{ flex: 1, padding: "4px", fontSize: "11px", minHeight: "24px" }}>追加</button>
                 <button onClick={() => setIsAddingCategory(false)} style={{ flex: 1, padding: "4px", fontSize: "11px", background: "#eee", border: "none", borderRadius: "4px" }}>戻る</button>
               </div>
+            </div>
+          )}
+
+          {/* Loan Selector (Appears when Repayment Mode is active) */}
+          {isRepaymentMode && type === 'expense' && (
+            <div style={{ marginTop: 8 }}>
+              <label style={{ display: "block", fontSize: "11px", color: "#b58b5a", marginBottom: "4px", fontWeight: "bold" }}>
+                返済先ローン
+              </label>
+              <select
+                value={loanId}
+                onChange={e => setLoanId(e.target.value)}
+                className="form-select"
+                style={{ width: "100%", padding: "8px", fontSize: "14px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: "6px", color: "#9a3412" }}
+              >
+                {loans.map(l => (
+                  <option key={l.id} value={l.id}>{l.name} (残: ¥{l.remaining_balance.toLocaleString()})</option>
+                ))}
+                {loans.length === 0 && <option value="">ローンなし</option>}
+              </select>
             </div>
           )}
         </div>
@@ -275,27 +313,27 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
           <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "4px" }}>支払い方法</label>
           {!isAddingAccount ? (
             <select
-              value={selectedAccount}
+              value={paymentMethodId}
               onChange={e => {
                 if (e.target.value === ADD_NEW_VALUE) {
                   setIsAddingAccount(true);
                 } else {
-                  setSelectedAccount(e.target.value);
+                  setPaymentMethodId(e.target.value);
                 }
               }}
               className="form-select"
               style={{ width: "100%", padding: "8px", fontSize: "14px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px" }}
             >
-              {accounts.map(a => (
-                <option key={a.id} value={a.name}>
+              {paymentMethods.map(a => (
+                <option key={a.id} value={a.id} disabled={a.type === 'card' && (!a.closing_day || !a.payment_day)}>
                   {a.name}
                 </option>
               ))}
-              {accounts.length === 0 && <option>なし</option>}
-              <option value={ADD_NEW_VALUE} style={{ color: "#007bff", fontWeight: "bold" }}>+ 追加...</option>
+              {paymentMethods.length === 0 && <option>なし</option>}
+              <option value={ADD_NEW_VALUE} style={{ color: "#007bff" }}>+ 追加...</option>
             </select>
           ) : (
-            <div className="animate-fade-in" style={{ padding: "4px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px" }}>
+            <div className="animate-fade-in" style={{ padding: "8px", background: "#fff", border: "1px solid #ddd", borderRadius: "6px", position: "absolute", zIndex: 10, width: "200px", right: 16 }}>
               <input
                 type="text"
                 value={newAccountName}
@@ -306,16 +344,23 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
               />
               <select
                 value={newAccountType}
-                onChange={e => setNewAccountType(e.target.value as any)}
+                onChange={(e) => setNewAccountType(e.target.value as any)}
                 style={{ width: "100%", marginBottom: "4px", fontSize: "11px", padding: "2px" }}
               >
-                <option value="wallet">財布</option>
-                <option value="bank">銀行</option>
-                <option value="card">カード</option>
-                <option value="qr">Pay</option>
+                <option value="cash">財布 (現金)</option>
+                <option value="bank">銀行口座</option>
+                <option value="card">クレジットカード</option>
               </select>
+              <input
+                type="number"
+                value={newAccountBalance}
+                onChange={e => setNewAccountBalance(e.target.value)}
+                placeholder="初期残高 (円)"
+                style={{ width: "100%", border: "none", borderBottom: "1px solid #eee", fontSize: "13px", padding: "4px", marginBottom: "8px" }}
+              />
+
               <div style={{ display: "flex", gap: "4px" }}>
-                <button onClick={handleAddAccount} className="btn-primary" style={{ flex: 1, padding: "4px", fontSize: "11px" }}>OK</button>
+                <button onClick={handleAddAccountSubmit} className="btn-primary" style={{ flex: 1, padding: "4px", fontSize: "11px", minHeight: "24px" }}>追加</button>
                 <button onClick={() => setIsAddingAccount(false)} style={{ flex: 1, padding: "4px", fontSize: "11px", background: "#eee", border: "none", borderRadius: "4px" }}>戻る</button>
               </div>
             </div>
@@ -342,20 +387,20 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
             value={memo}
             onChange={e => setMemo(e.target.value)}
             className="form-input"
-            placeholder="ランチなど"
+            placeholder={isRepaymentMode ? '例: 今月分' : 'ランチなど'}
             style={{ padding: "6px", fontSize: "13px" }}
           />
         </div>
       </div>
 
-      <div style={{ marginTop: "24px" }}>
+      <div style={{ marginTop: "16px" }}>
         <button
           onClick={handleSave}
           disabled={loading || !amount}
           className="btn-primary"
           style={{ width: "100%", padding: "12px", fontSize: "16px", fontWeight: 700, marginTop: "8px" }}
         >
-          {loading ? "保存中..." : "記録する"}
+          {loading ? "保存中..." : isRepaymentMode ? '返済を記録' : '記録する'}
         </button>
       </div>
     </div>

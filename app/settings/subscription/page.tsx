@@ -55,6 +55,7 @@ export default function SubscriptionSettingsPage() {
     if (accountsRaw) {
       try {
         const parsed = JSON.parse(accountsRaw) as Account[];
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAccounts(parsed);
       } catch (e) {
         console.error("accounts read error", e);
@@ -68,11 +69,11 @@ export default function SubscriptionSettingsPage() {
         const parsed = JSON.parse(settingsRaw) as AppSettings;
         const list = parsed.subscriptions ?? [];
         // Migration check: if data has billingDay but no nextPaymentDate
-        const migrated = list.map((s: any) => {
-          if (s.nextPaymentDate) return s;
+        const migrated = list.map((s: Record<string, unknown>) => {
+          if (s.nextPaymentDate) return s as unknown as Subscription;
           // Migrate legacy
           const d = new Date();
-          const day = s.billingDay || s.paymentDay || 1;
+          const day = Number(s.billingDay || s.paymentDay || 1);
           const m = d.getDate() > day ? d.getMonth() + 2 : d.getMonth() + 1; // next month if passed
           const y = d.getFullYear();
           const nd = new Date(y, m - 1, day);
@@ -84,7 +85,7 @@ export default function SubscriptionSettingsPage() {
             ...s,
             frequency: s.frequency || "monthly",
             nextPaymentDate: `${yyyy}-${mm}-${dd}`
-          };
+          } as Subscription;
         });
 
         if (migrated.length > 0) {
@@ -109,7 +110,7 @@ export default function SubscriptionSettingsPage() {
   const handleChange =
     (id: string, field: keyof Subscription) =>
       (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        let value: any = e.target.value;
+        let value: string | number = e.target.value;
 
         if (field === "amount") {
           value = Number(value || 0);
@@ -142,7 +143,7 @@ export default function SubscriptionSettingsPage() {
       const newSettings: AppSettings = { ...settings, subscriptions: cleaned };
       localStorage.setItem("settings", JSON.stringify(newSettings));
       alert("サブスク設定を保存しました！");
-    } catch (e) {
+    } catch {
       alert("保存に失敗しました");
     }
   };

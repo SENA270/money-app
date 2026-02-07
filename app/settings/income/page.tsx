@@ -40,8 +40,8 @@ export default function IncomeSettingsPage() {
       if (accountsRaw) {
         const accounts: Account[] = JSON.parse(accountsRaw);
         const banks = accounts.filter((a) => a.type === "bank");
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBankAccounts(banks);
-
         // 銀行口座が1つだけならデフォルト選択
         if (banks.length === 1) {
           setDepositAccountId(banks[0].id);
@@ -202,7 +202,7 @@ export default function IncomeSettingsPage() {
       </div>
 
       <div style={{ marginTop: 16, fontSize: 14 }}>
-        <a href="/">◀ ホームに戻る</a>
+        <Link href="/">◀ ホームに戻る</Link>
       </div>
     </div>
   );
