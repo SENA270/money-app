@@ -1,7 +1,7 @@
 // app/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -12,6 +12,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Staging: Auto-login if auth is disabled
+  const isStaging = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  useEffect(() => {
+    if (isStaging) {
+      const autoLogin = async () => {
+        setLoading(true);
+        try {
+          // Use hardcoded test credentials for staging
+          const { error } = await supabase.auth.signInWithPassword({
+            email: "testdayo555@gmail.com",
+            password: "testdayo555!!"
+          });
+          if (error) throw error;
+          router.push("/");
+        } catch (e: any) {
+          console.error("Auto-login failed:", e);
+          setError("自動ログインに失敗しました: " + e.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      autoLogin();
+    }
+  }, [isStaging, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +76,11 @@ export default function LoginPage() {
   return (
     <div className="page-container">
       <h1>ログイン / 新規登録</h1>
+      {isStaging && (
+        <div style={{ background: '#fff3cd', color: '#856404', padding: '10px', marginBottom: '20px', borderRadius: '4px', textAlign: 'center' }}>
+          ⚠️ Staging Mode: Auto-logging in...
+        </div>
+      )}
 
       <div
         className="app-card"
@@ -180,8 +211,8 @@ export default function LoginPage() {
             {loading
               ? "処理中..."
               : mode === "login"
-              ? "ログイン"
-              : "登録してログイン"}
+                ? "ログイン"
+                : "登録してログイン"}
           </button>
         </form>
       </div>
