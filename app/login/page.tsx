@@ -14,9 +14,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Staging: Auto-login if auth is disabled
-  const isStaging = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+  const disableAuthVar = process.env.NEXT_PUBLIC_DISABLE_AUTH;
+  const isStaging = disableAuthVar?.toLowerCase() === 'true';
 
   useEffect(() => {
+    console.log("Login Page Mounted. Env Var: ", process.env.NEXT_PUBLIC_DISABLE_AUTH); // Debug log
     if (isStaging) {
       const autoLogin = async () => {
         setLoading(true);
