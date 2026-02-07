@@ -3,37 +3,36 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, ClipboardList, BarChart, CreditCard, Settings, Plus } from "lucide-react";
+import { Home, ClipboardList, BarChart, Plus, Menu } from "lucide-react";
+import MenuSheet from "./MenuSheet";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [showInputMenu, setShowInputMenu] = useState(false);
+  const [showMenuSheet, setShowMenuSheet] = useState(false);
 
-  // 認証前や特定のページでは表示しない場合のロジックが必要ならここに追加
-  // 例: if (pathname === "/login") return null;
-  // AppShell側で制御するほうがスマートかも
+  // 1: Home
+  // 2: Analysis
+  // 3: Input (FAB)
+  // 4: History
+  // 5: Menu
 
   const navItems = [
     { href: "/", label: "ホーム", icon: <Home size={24} /> },
-    { href: "/history", label: "明細", icon: <ClipboardList size={24} /> },
-    { href: "/debt", label: "ローン", icon: <CreditCard size={24} /> },
-    { isCenter: true },
     { href: "/analysis", label: "分析", icon: <BarChart size={24} /> },
-    { href: "/settings", label: "設定", icon: <Settings size={24} /> },
+    { isCenter: true },
+    { href: "/history", label: "履歴", icon: <ClipboardList size={24} /> },
+    { isMenu: true, label: "メニュー", icon: <Menu size={24} /> },
   ];
 
   const handleCenterClick = () => {
-    // とりあえず入力モーダルの代わりに選択肢を表示、またはInputページへ遷移
-    // MVP: 中央ボタンクリックでInput選択モーダル表示
     setShowInputMenu(true);
   };
 
   const handleInputSelect = (mode: "expense" | "income" | "scan") => {
     setShowInputMenu(false);
     if (mode === "scan") {
-      // カメラ機能へ（Inputページにパラメータ渡すか、専用ページか）
-      // ここでは /input にパラメータ付きで飛ばす
       router.push("/input?mode=scan");
     } else {
       router.push(`/input?mode=${mode}`);
@@ -58,6 +57,24 @@ export default function BottomNav() {
             );
           }
 
+          if (item.isMenu) {
+            const isMenuActive = showMenuSheet; // Or matching /settings, /debt paths?
+            // Actually, if we are on /debt or /settings, maybe highlight Menu?
+            // Let's keep it simple: highlight if sheet is open OR path starts with /settings or /debt
+            const isActive = isMenuActive || pathname.startsWith("/settings") || pathname.startsWith("/debt");
+
+            return (
+              <button
+                key="menu"
+                className={`bottom-nav-item ${isActive ? "active" : ""}`}
+                onClick={() => setShowMenuSheet(true)}
+              >
+                <div className="icon-container">{item.icon}</div>
+                <span className="label">{item.label}</span>
+              </button>
+            );
+          }
+
           const isActive = pathname === item.href;
           return (
             <Link
@@ -72,27 +89,47 @@ export default function BottomNav() {
         })}
       </nav>
 
-      {/* Input Selection Modal (Simple Sheet) */}
+      {/* Input Selection Modal */}
       {showInputMenu && (
-        <div className="modal-overlay" onClick={() => setShowInputMenu(false)}>
+        <div className="modal-overlay" onClick={() => setShowInputMenu(false)} style={{ zIndex: 4000 }}>
           <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle"></div>
             <h3 style={{ textAlign: 'center', marginBottom: 20, color: '#5d4330' }}>入力を選択</h3>
-            <button className="sheet-btn expense" onClick={() => handleInputSelect("expense")}>
-              <span style={{ fontSize: 20, marginRight: 8 }}>💸</span> 支出を入力
-            </button>
-            <button className="sheet-btn income" onClick={() => handleInputSelect("income")}>
-              <span style={{ fontSize: 20, marginRight: 8 }}>💰</span> 収入を入力
-            </button>
-            <button className="sheet-btn camera" onClick={() => handleInputSelect("scan")}>
-              <span style={{ fontSize: 20, marginRight: 8 }}>📷</span> レシート撮影
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+              <button className="sheet-icon-btn" onClick={() => handleInputSelect("expense")}>
+                <div style={{ background: '#ffe4e1', padding: 16, borderRadius: '50%', fontSize: 24, marginBottom: 8 }}>💸</div>
+                <span>支出</span>
+              </button>
+              <button className="sheet-icon-btn" onClick={() => handleInputSelect("income")}>
+                <div style={{ background: '#e0f7fa', padding: 16, borderRadius: '50%', fontSize: 24, marginBottom: 8 }}>💰</div>
+                <span>収入</span>
+              </button>
+              <button className="sheet-icon-btn" onClick={() => handleInputSelect("scan")}>
+                <div style={{ background: '#e8f5e9', padding: 16, borderRadius: '50%', fontSize: 24, marginBottom: 8 }}>📷</div>
+                <span>レシート</span>
+              </button>
+            </div>
             <button className="sheet-btn cancel" onClick={() => setShowInputMenu(false)}>
               キャンセル
             </button>
           </div>
         </div>
       )}
+
+      {/* Menu Sheet */}
+      <MenuSheet isOpen={showMenuSheet} onClose={() => setShowMenuSheet(false)} />
+
+      <style jsx>{`
+        .sheet-icon-btn {
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           background: none;
+           border: none;
+           color: #555;
+           font-size: 12px;
+        }
+      `}</style>
     </>
   );
 }

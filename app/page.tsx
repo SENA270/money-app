@@ -7,6 +7,8 @@ import { useTimeline } from "./hooks/useTimeline";
 import { useCategories } from "./hooks/useCategories";
 import { calculateMonthlyAnalysis } from "./lib/analysisCalculator";
 import { Transaction, AnalysisResult } from "./types";
+import LoanStatusWidget from "./components/Summary/LoanStatusWidget";
+import ForecastHealthWidget from "./components/Summary/ForecastHealthWidget";
 
 export default function Home() {
   const { timeline, currentBalance, loading: timelineLoading } = useTimeline(6);
@@ -80,23 +82,22 @@ export default function Home() {
       </header>
 
       {/* 1. Asset Balance Card */}
-      <div className="app-card" style={{ background: "#2c3e50", color: "#fff" }}>
+      <div className="app-card" style={{ background: "#2c3e50", color: "#fff", marginBottom: 16 }}>
         <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>現在の資産残高</p>
-        <p style={{ fontSize: 32, fontWeight: 700, letterSpacing: 1 }}>
-          ¥{currentBalance.toLocaleString()}
-        </p>
-        {dangerDate ? (
-          <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(231, 76, 60, 0.2)", borderRadius: 6, border: "1px solid #e74c3c", color: "#ffcccc", fontSize: 13 }}>
-            ⚠️ {daysUntilDanger}日後 ({dangerDate.getMonth() + 1}/{dangerDate.getDate()}) に資金ショートの可能性があります
-          </div>
-        ) : (
-          <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
-            ✅ 当面の資金繰りは安全です
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <p style={{ fontSize: 32, fontWeight: 700, letterSpacing: 1 }}>
+            ¥{currentBalance.toLocaleString()}
+          </p>
+        </div>
+
+        {/* Helper Widget for Health Check */}
+        <ForecastHealthWidget daysUntilDanger={daysUntilDanger} dangerDate={dangerDate} />
       </div>
 
-      {/* 2. Monthly Summary */}
+      {/* 2. Loan Status (New) */}
+      <LoanStatusWidget />
+
+      {/* 3. Monthly Summary */}
       <div className="grid-container" style={{ marginTop: 16 }}>
         {/* Spent */}
         <div className="app-card" style={{ marginBottom: 0 }}>
