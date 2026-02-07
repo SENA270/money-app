@@ -88,7 +88,7 @@ export default function HistoryPage() {
   // Filter
   const filtered = transactions.filter(t =>
     (t.memo || "").includes(searchQuery) ||
-    getCategoryName(t.category_id).includes(searchQuery) ||
+    getCategoryName(t.category_id || "").includes(searchQuery) ||
     String(t.amount).includes(searchQuery)
   );
 
@@ -175,7 +175,7 @@ export default function HistoryPage() {
                           borderRadius: 4,
                           whiteSpace: "nowrap"
                         }}>
-                          {getCategoryName(tx.category_id)}
+                          {getCategoryName(tx.category_id || "")}
                         </span>
                         <span style={{ fontWeight: 600, fontSize: 14, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {tx.memo || "（メモなし）"}
@@ -183,7 +183,7 @@ export default function HistoryPage() {
                       </div>
                       {/* Bottom Row: Payment Method */}
                       <div style={{ fontSize: 11, color: "#999" }}>
-                        {getPaymentName(tx.payment_method_id)}
+                        {getPaymentName(tx.payment_method_id || "")}
                       </div>
                     </div>
 

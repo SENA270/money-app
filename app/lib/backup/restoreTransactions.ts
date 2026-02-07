@@ -1,5 +1,5 @@
 
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../../lib/supabaseClient";
 import { TransactionRecord, RestoreResult } from "./types";
 
 export async function restoreTransactions(

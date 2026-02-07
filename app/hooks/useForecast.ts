@@ -168,7 +168,7 @@ export function useForecast(monthsToForecast: number = 6) {
           if (t.date > todayStr) return; // Future
 
           // Try matching by ID first, then Name
-          let acc = t.payment_method_id ? assetBalances.get(t.payment_method_id) : assetBalances.get(t.payment);
+          let acc = t.payment_method_id ? assetBalances.get(t.payment_method_id) : assetBalances.get(t.payment || "");
 
           if (acc) {
             if (t.type === "expense" || t.type === "card_payment" || t.type === "repayment") {
