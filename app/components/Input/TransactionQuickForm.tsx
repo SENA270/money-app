@@ -323,7 +323,14 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
   return (
     <div className="app-card" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-      {/* Header: Type Switcher & Amount */}
+      {/* DEBUG UI - REMOVE AFTER FIX */}
+      <div style={{ fontSize: "10px", color: "red", background: "#fee", padding: "4px" }}>
+        Debug: Loading={String(recentLoading)}, Tpl={quickTemplates.length}, Hist={quickHistory.length}
+        <br />
+        User: {supabase.auth.getUser().then(r => r.data.user?.id || 'none')}
+      </div>
+
+      {/* C-2: Quick Actions (Templates & History) */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "2px", width: "120px" }}>
           <button
