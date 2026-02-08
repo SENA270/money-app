@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import { Menu } from "lucide-react";
 
 const tabs = [
   { href: "/", label: "ホーム" },
@@ -82,11 +83,9 @@ export default function Header() {
           }}
         >
           {/* ロゴ */}
-          <div style={{ fontWeight: 600, color: "#5d4330", fontSize: "16px" }}>
-            <span className="logo-text-full">
-              家計アプリ <span style={{ fontSize: "11px" }}>– local money note –</span>
-            </span>
-            <span className="logo-text-short">local money note</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[#3b2a1a] font-bold text-lg tracking-tight">Focus</span>
+            <span className="text-[10px] text-[#8c7b6c] bg-[#f5efe6] px-1.5 py-0.5 rounded">Money</span>
           </div>
 
           {/* Desktop Nav */}
@@ -129,7 +128,7 @@ export default function Header() {
             type="button"
             aria-label="メニューを開く"
           >
-            {isMenuOpen ? "✕" : "☰"}
+            {isMenuOpen ? "✕" : <Menu className="w-6 h-6 text-[#5d4330]" />}
           </button>
         </div>
       </header>

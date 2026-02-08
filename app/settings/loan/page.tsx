@@ -58,13 +58,13 @@ export default function LoanSettingsPage() {
           </div>
         ) : (
           loans.map((loan) => (
-            <div key={loan.id} className="bg-white rounded-2xl shadow-sm border border-[#f0ebde] overflow-hidden">
+            <div key={loan.id} className="bg-white rounded-2xl shadow-lg border-0 ring-1 ring-black/5 overflow-hidden transition-transform hover:scale-[1.01]">
               <div className="p-5">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="font-bold text-lg text-[#3b2a1a] mb-1">{loan.name}</h3>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                      <span className="bg-[#f5efe6] text-[#8c7b6c] px-2 py-0.5 rounded font-medium">
                         {loan.repayment_rule === 'monthly' ? '毎月払い' : loan.repayment_rule === 'semiannual' ? 'ボーナス併用' : 'カスタム'}
                       </span>
                       {loan.interest_rate > 0 && <span>年利 {loan.interest_rate}%</span>}
@@ -72,15 +72,14 @@ export default function LoanSettingsPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-400 mb-0.5">現在残高</p>
-                    {/* Accessing remaining_amount from LoanWithStatus type */}
-                    <p className="text-lg font-bold text-[#3b2a1a] font-mono">
+                    <p className="text-lg font-bold text-[#3b2a1a] font-mono tracking-tight">
                       {formatCurrency((loan as any).remaining_amount || 0)}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-[#fffaf5] p-3 rounded-xl border border-[#f5efe6]">
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className="bg-[#fcf9f4] p-3 rounded-xl">
                     <p className="text-xs text-[#8c7b6c] mb-1 flex items-center gap-1">
                       <CreditCard className="w-3 h-3" /> 月々の返済
                     </p>
@@ -88,9 +87,9 @@ export default function LoanSettingsPage() {
                       {formatCurrency(loan.monthly_amount || 0)}
                     </p>
                   </div>
-                  <div className="bg-[#fffaf5] p-3 rounded-xl border border-[#f5efe6]">
+                  <div className="bg-[#fcf9f4] p-3 rounded-xl">
                     <p className="text-xs text-[#8c7b6c] mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> 次回支払日 (予定)
+                      <Calendar className="w-3 h-3" /> 次回支払日
                     </p>
                     <p className="font-bold text-[#5d4330]">
                       {loan.payment_day ? `毎月 ${loan.payment_day}日` : '未設定'}
@@ -98,20 +97,20 @@ export default function LoanSettingsPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex justify-end">
+                <div className="pt-4 border-t border-gray-100 flex justify-end">
                   <button
                     onClick={() => handleEdit(loan)}
-                    className="flex items-center gap-1.5 text-sm font-bold text-[#b58b5a] hover:bg-[#fffaf5] px-4 py-2 rounded-lg transition-colors"
+                    className="flex items-center justify-center gap-2 w-full text-sm font-bold text-[#b58b5a] bg-[#fffaf5] hover:bg-[#ffe4c4] py-3 rounded-xl transition-colors"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    条件を変更
+                    <Edit2 className="w-4 h-4" />
+                    条件を変更する
                   </button>
                 </div>
               </div>
-              {/* Progress Bar (Visual flair) */}
-              <div className="h-1 bg-[#f0ebde] w-full">
+              {/* Progress Bar */}
+              <div className="h-1.5 bg-[#f0ebde] w-full">
                 <div
-                  className="h-full bg-[#b58b5a]"
+                  className="h-full bg-gradient-to-r from-[#b58b5a] to-[#d4a373]"
                   style={{ width: `${loan.principal > 0 ? ((loan as any).paid_amount / loan.principal) * 100 : 0}%` }}
                 />
               </div>

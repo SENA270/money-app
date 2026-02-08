@@ -203,7 +203,22 @@ export default function AccountSettingsPage() {
             <h3>{editingId === "new" ? "新規追加" : "設定の編集"}</h3>
 
             <div className="form-group">
-              <label>名称</label>
+              <label className="form-label">種類</label>
+              <select
+                className="form-select"
+                value={editForm.type || "bank"}
+                onChange={e => setEditForm({ ...editForm, type: e.target.value as PaymentMethodType })}
+                disabled={editingId !== "new" && false} // Allow editing even if existing
+              >
+                <option value="bank">銀行口座</option>
+                <option value="cash">現金・財布</option>
+                <option value="card">クレジットカード</option>
+                <option value="pay">電子マネー (Pay)</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">名称</label>
               <input type="text" className="form-input" value={editForm.name || ""} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder="例: メインバンク / 楽天カード" />
             </div>
 

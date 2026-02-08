@@ -83,27 +83,28 @@ export function useAnalysisData() {
         }
         const lastStart = `${lastYear}-${String(lastMonth).padStart(2, '0')}-01`;
 
-        // Fetch BOTH months
-        const { data, error } = await supabase
-          .from("transactions")
-          .select("*, payment_methods(name, type)")
-          .eq("user_id", user.id)
-          .gte("date", lastStart)
-          .lte("date", currentEnd);
+        // Fetch in Parallel
+        const [txRes, budgetRes] = await Promise.all([
+          supabase
+            .from("transactions")
+            .select("*, payment_methods(name, type)")
+            .eq("user_id", user.id)
+            .gte("date", lastStart)
+            .lte("date", currentEnd),
 
-        if (error) throw error;
-        setTransactions((data || []) as Transaction[]);
+          supabase
+            .from("category_budgets")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("year", viewYear)
+            .eq("month", viewMonth)
+        ]);
 
-        // Fetch Budgets for Current Month
-        const { data: budgetData, error: budgetError } = await supabase
-          .from("category_budgets")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("year", viewYear)
-          .eq("month", viewMonth);
+        if (txRes.error) throw txRes.error;
+        setTransactions((txRes.data || []) as Transaction[]);
 
-        if (budgetError) console.error("Budget fetch error", budgetError);
-        setBudgets((budgetData || []) as CategoryBudget[]);
+        if (budgetRes.error) console.error("Budget fetch error", budgetRes.error);
+        setBudgets((budgetRes.data || []) as CategoryBudget[]);
 
       } catch (err) {
         console.error("Analysis load error", err);
@@ -248,3 +249,6 @@ export function useAnalysisData() {
     repaymentBreakdown: Object.entries(derivedData.maps.repayment).map(([name, amount]) => ({ name, amount })),
   };
 }
+
+// In app/analysis/page.tsx (or wherever this hook is used), user should import Skeleton and use it.
+// Waiting for next step to edit `app/analysis/page.tsx`.

@@ -22,6 +22,7 @@ export default function Footer() {
         textAlign: "center",
         color: "#5d4330",
       }}
+      className="footer-desktop"
     >
       <span style={{ marginRight: 8 }}>© local money note</span>
 
@@ -41,6 +42,13 @@ export default function Footer() {
         請求
       </Link>
       <Link href="/settings">設定</Link>
-    </footer>
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .footer-desktop {
+            display: none !important;
+          }
+        }
+      `}</style>
+    </footer >
   );
 }

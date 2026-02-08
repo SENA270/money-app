@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import { useTimeline } from "./hooks/useTimeline";
@@ -25,51 +25,85 @@ export default function Home() {
   const remainingDays = daysInMonth - today.getDate();
 
   // 1. Calculate Analysis (Current Month Spending)
-  useEffect(() => {
-    const loadAnalysis = async () => {
-      if (catLoading) return;
+  // Optimization: Fetch transactions in parallel, don't wait for categories to start fetching
+  const [monthTransactions, setMonthTransactions] = useState<Transaction[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchMonthTx = async () => {
       try {
-        setAnalysisLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
         const start = new Date(currentYear, currentMonth - 1, 1).toISOString();
         const end = new Date(currentYear, currentMonth, 1).toISOString();
 
-        const { data: txData } = await supabase
+        const { data } = await supabase
           .from("transactions")
           .select("*")
           .eq("user_id", user.id)
           .gte("date", start)
           .lt("date", end);
 
-        const transactions = (txData || []) as Transaction[];
-        const result = calculateMonthlyAnalysis(transactions, categories, currentYear, currentMonth);
-        setAnalysis(result);
+        setMonthTransactions((data || []) as Transaction[]);
       } catch (e) {
         console.error(e);
       } finally {
-        setAnalysisLoading(false);
+        setTxLoading(false);
       }
     };
-    loadAnalysis();
-  }, [categories, catLoading, currentYear, currentMonth]);
+    fetchMonthTx();
+  }, [currentYear, currentMonth]);
+
+  // Combine Transactions + Categories when both ready
+  useEffect(() => {
+    if (catLoading || txLoading) {
+      setAnalysisLoading(true);
+      return;
+    }
+    const result = calculateMonthlyAnalysis(monthTransactions, categories, currentYear, currentMonth);
+    setAnalysis(result);
+    setAnalysisLoading(false);
+  }, [monthTransactions, categories, catLoading, txLoading, currentYear, currentMonth]);
 
 
   // 2. Identify Danger Date
-  // Find first future event where balance < 0
-  const dangerEvent = timeline.find(e => e.status === 'forecast' && (e.balance || 0) < 0);
-  const dangerDate = dangerEvent ? new Date(dangerEvent.date) : null;
-  const daysUntilDanger = dangerDate ? Math.ceil((dangerDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const { dangerDate, daysUntilDanger } = useMemo(() => {
+    // Find first future event where balance < 0
+    const dangerEvent = timeline.find(e => e.status === 'forecast' && (e.balance || 0) < 0);
+    const dDate = dangerEvent ? new Date(dangerEvent.date) : null;
+    const days = dDate ? Math.ceil((dDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    return { dangerDate: dDate, daysUntilDanger: days };
+  }, [timeline]);
 
   // 3. Next Payment
-  // Find first future negative event
-  const nextPayment = timeline.find(e => e.status === 'forecast' && e.amount < 0);
+  const nextPayment = useMemo(() => {
+    return timeline.find(e => e.status === 'forecast' && e.amount < 0);
+  }, [timeline]);
 
 
   if (timelineLoading || catLoading || analysisLoading) {
-    return <div className="page-container" style={{ paddingTop: 40, textAlign: "center" }}>Loading Dashboard...</div>;
+    return (
+      <div className="page-container padding-bottom-nav">
+        <header style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 20, color: "#5d4330" }}>{currentYear}年{currentMonth}月</h1>
+        </header>
+
+        {/* Asset Skeleton */}
+        <div className="bg-[#2c3e50] rounded-2xl p-5 mb-4 shadow-lg mx-auto w-full max-w-md h-[140px] animate-pulse relative">
+          <div className="absolute inset-0 bg-gray-700 opacity-20" />
+        </div>
+
+        {/* Loan Widget Skeleton */}
+        <div className="app-card h-[80px] animate-pulse bg-gray-200" />
+
+        {/* Summary Skeleton */}
+        <div className="grid-container" style={{ marginTop: 16 }}>
+          <div className="app-card h-[100px] animate-pulse bg-gray-200" style={{ marginBottom: 0 }} />
+          <div className="app-card h-[100px] animate-pulse bg-gray-200" style={{ marginBottom: 0 }} />
+        </div>
+      </div>
+    );
   }
 
   const totalSpent = analysis?.total || 0;
@@ -81,17 +115,22 @@ export default function Home() {
         <h1 style={{ fontSize: 20, color: "#5d4330" }}>{currentYear}年{currentMonth}月</h1>
       </header>
 
-      {/* 1. Asset Balance Card */}
-      <div className="app-card" style={{ background: "#2c3e50", color: "#fff", marginBottom: 16 }}>
-        <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>現在の資産残高</p>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-          <p style={{ fontSize: 32, fontWeight: 700, letterSpacing: 1 }}>
-            ¥{currentBalance.toLocaleString()}
-          </p>
+      {/* 1. Asset Balance Card (Compact) */}
+      <div className="bg-[#2c3e50] text-white rounded-2xl p-5 mb-4 shadow-lg mx-auto w-full max-w-md relative overflow-hidden">
+        <div className="flex justify-between items-end relative z-10">
+          <div>
+            <p className="text-xs text-gray-300 mb-0.5 tracking-wide">現在の資産残高</p>
+            <p className="text-3xl font-bold tracking-tight font-mono">
+              ¥{currentBalance.toLocaleString()}
+            </p>
+          </div>
+          <div className="mb-1">
+            <ForecastHealthWidget daysUntilDanger={daysUntilDanger} dangerDate={dangerDate} />
+          </div>
         </div>
 
-        {/* Helper Widget for Health Check */}
-        <ForecastHealthWidget daysUntilDanger={daysUntilDanger} dangerDate={dangerDate} />
+        {/* Decorative Circle */}
+        <div className="absolute -right-6 -top-10 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
       </div>
 
       {/* 2. Loan Status (New) */}

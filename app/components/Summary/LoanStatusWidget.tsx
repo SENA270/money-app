@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getLoans } from "@/app/lib/loans";
 import { ChevronRight, CreditCard, AlertCircle } from "lucide-react";
 
-export default function LoanStatusWidget() {
+const LoanStatusWidget = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -83,4 +83,6 @@ export default function LoanStatusWidget() {
       </div>
     </Link>
   );
-}
+};
+
+export default React.memo(LoanStatusWidget);

@@ -7,6 +7,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import BottomNav from "./BottomNav";
 import SwipeNav from "./SwipeNav";
+import UpdateNotification from "./UpdateNotification";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SwipeNav>
           <Footer />
           {pathname !== "/receipt" && <BottomNav />}
+          <UpdateNotification />
         </AuthGuard>
       )}
     </body>
