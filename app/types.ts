@@ -76,6 +76,9 @@ export interface Database {
           user_id: string
           name: string
           type: 'cash' | 'card' | 'bank'
+          balance?: number
+          closing_day?: number | null
+          payment_day?: number | null
           created_at: string
         }
         Insert: {
@@ -83,6 +86,9 @@ export interface Database {
           user_id?: string
           name: string
           type: 'cash' | 'card' | 'bank'
+          balance?: number
+          closing_day?: number | null
+          payment_day?: number | null
           created_at?: string
         }
         Update: {
@@ -90,6 +96,9 @@ export interface Database {
           user_id?: string
           name?: string
           type?: 'cash' | 'card' | 'bank'
+          balance?: number
+          closing_day?: number | null
+          payment_day?: number | null
           created_at?: string
         }
       }
