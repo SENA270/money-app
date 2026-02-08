@@ -181,9 +181,9 @@ export interface Database {
 
 export type PaymentMethodType = 'cash' | 'card' | 'bank';
 
-export type Transaction = Database['public']['Tables']['transactions']['Row'] & {
-  type: 'income' | 'expense' | 'repayment'; // Extended to suppress TS error
-  loan_id?: string | null; // Often used in UI
+export type Transaction = Omit<Database['public']['Tables']['transactions']['Row'], 'type'> & {
+  type: 'income' | 'expense' | 'repayment';
+  loan_id?: string | null;
 };
 
 export type Category = Database['public']['Tables']['categories']['Row'];
@@ -215,6 +215,8 @@ export type TimelineEvent = {
   type: 'income' | 'expense' | 'balance' | 'transaction' | 'card_payment';
   balance?: number;
   status?: 'forecast' | 'confirmed';
+  cardPaymentMethodId?: string; // Added
+  transactionId?: string; // Added
 };
 
 // Analysis Result
@@ -228,7 +230,7 @@ export type AnalysisResult = {
     categoryName: string;
     name?: string; // kept for compatibility if needed
     amount: number;
-    percentage: number;
+    percentage?: number; // Made optional
     color?: string;
   }[];
   daily?: { date: string; income: number; expense: number }[];
