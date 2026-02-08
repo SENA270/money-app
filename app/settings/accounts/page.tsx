@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePaymentMethods } from "../../hooks/usePaymentMethods";
 import { PaymentMethod, PaymentMethodType } from "../../types";
+import { Calendar, AlertCircle } from "lucide-react";
 
 const CARD_PRESETS = [
   { label: "末締め / 翌月27日払い (楽天など)", close: 99, pay: 27 },
@@ -160,9 +161,23 @@ export default function AccountSettingsPage() {
                 <div style={{ fontSize: 11, color: "#c44536" }}>
                   {/* Card date settings status */}
                   {(acc.closing_day === undefined || acc.payment_day === undefined || acc.closing_day === null) ? (
-                    <span style={{ fontWeight: "bold", background: "#ffeeba", padding: "2px 4px", borderRadius: 4 }}>⚠️ 日付未設定</span>
+                    <span className="flex items-center gap-1 font-bold bg-[#ffeeba] px-1.5 py-0.5 rounded text-xs text-yellow-800">
+                      <AlertCircle className="w-3 h-3" /> 日付未設定
+                    </span>
                   ) : (
-                    <span>{acc.closing_day === 99 ? "末" : acc.closing_day}日締 / {acc.payment_day}日払</span>
+                    <div className="mt-0.5">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        {acc.closing_day === 99 ? "末" : acc.closing_day}日締め / {acc.payment_day}日払い
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-500 bg-gray-50 inline-flex items-center px-2 py-1 rounded border border-gray-100">
+                        <span className="font-medium text-gray-600">利用:</span>
+                        <span className="ml-1">{acc.closing_day === 99 ? "1日〜末日" : `${acc.closing_day + 1}日〜${acc.closing_day}日`}</span>
+                        <span className="mx-1.5 text-gray-300">→</span>
+                        <span className="font-medium text-[#c44536]">引落:</span>
+                        <span className="ml-1">翌月{acc.payment_day}日</span>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

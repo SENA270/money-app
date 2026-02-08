@@ -1,420 +1,137 @@
-// app/settings/loan/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-
-type Frequency = "monthly" | "half-year" | "yearly";
-
-type LoanItem = {
-  id: string;
-  name: string;             // 名称（奨学金Aなど）
-  amountPerPayment: number; // 1回あたり返済額
-  startDate: string;        // 開始日（YYYY-MM-DD）
-  paymentDay: number;       // 毎月の何日か（1〜31）
-  frequency: Frequency;     // 毎月 / 半年ごと / 年1回
-  numberOfPayments: number; // 何回払いか（最大999）
-  memo: string;
-};
-
-type AppSettings = {
-  loans?: LoanItem[];
-  [key: string]: unknown; // 他の設定も壊さないため
-};
-
-function createId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
+import { useLoans, Loan } from "../../hooks/useLoans";
+import EditLoanModal from "../../components/Settings/EditLoanModal";
+import { Plus, Edit2, Calendar, CreditCard } from "lucide-react";
 
 export default function LoanSettingsPage() {
-  const [items, setItems] = useState<LoanItem[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
+  const { loans, loading, updateLoan } = useLoans();
+  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 初期読み込み
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = localStorage.getItem("settings");
-    if (!raw) return;
+  const handleEdit = (loan: Loan) => {
+    setSelectedLoan(loan);
+    setIsModalOpen(true);
+  };
 
-    try {
-      const parsed = JSON.parse(raw) as AppSettings;
-      const stored = parsed.loans || [];
+  const handleSave = async (id: string, updates: Partial<Loan>) => {
+    await updateLoan(id, updates);
+    setIsModalOpen(false);
+  };
 
-      const normalized: LoanItem[] = stored.map((item) => ({
-        id: item.id || createId(),
-        name: item.name ?? "",
-        amountPerPayment: Number(item.amountPerPayment ?? 0),
-        startDate: item.startDate ?? "",
-        paymentDay: Number(item.paymentDay ?? 1),
-        frequency: (item.frequency as Frequency) ?? "monthly",
-        numberOfPayments: Number(item.numberOfPayments ?? 0),
-        memo: item.memo ?? "",
-      }));
+  const formatCurrency = (val: number) => `¥${val.toLocaleString()}`;
 
-      setItems(normalized);
-    } catch (e) {
-      console.error("返済設定の読み込みに失敗しました", e);
-    }
-  }, []);
-
-  // 入力変更
-  const handleChange = (
-    id: string,
-    field: keyof LoanItem,
-    value: string
-  ) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-
-        // 数値系
-        if (
-          field === "amountPerPayment" ||
-          field === "paymentDay" ||
-          field === "numberOfPayments"
-        ) {
-          let num = Number(value);
-
-          if (field === "paymentDay") {
-            // 支払日は 1〜31 にクランプ
-            num = isNaN(num) ? 1 : num;
-            num = Math.max(1, Math.min(31, num));
-            return { ...item, paymentDay: num };
-          }
-
-          if (field === "numberOfPayments") {
-            // 回数は 1〜999 にクランプ
-            num = isNaN(num) ? 0 : num;
-            num = Math.max(1, Math.min(999, num));
-            return { ...item, numberOfPayments: num };
-          }
-
-          // amountPerPayment
-          num = isNaN(num) ? 0 : num;
-          return { ...item, amountPerPayment: num };
-        }
-
-        // frequency
-        if (field === "frequency") {
-          return { ...item, frequency: value as Frequency };
-        }
-
-        // その他（name, startDate, memo）
-        return { ...item, [field]: value };
-      })
+  if (loading) {
+    return (
+      <div className="page-container flex justify-center items-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b58b5a]"></div>
+      </div>
     );
-  };
-
-  const handleAdd = () => {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: createId(),
-        name: "",
-        amountPerPayment: 0,
-        startDate: "",
-        paymentDay: 1,
-        frequency: "monthly",
-        numberOfPayments: 1,
-        memo: "",
-      },
-    ]);
-  };
-
-  const handleDelete = (id: string) => {
-    if (!confirm("この返済情報を削除しますか？")) return;
-    setItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const handleSave = () => {
-    if (typeof window === "undefined") return;
-    setIsSaving(true);
-
-    try {
-      const raw = localStorage.getItem("settings");
-      let base: AppSettings = {};
-      if (raw) {
-        base = JSON.parse(raw);
-      }
-      base.loans = items;
-      localStorage.setItem("settings", JSON.stringify(base));
-      alert("返済設定を保存しました");
-    } catch (e) {
-      console.error("返済設定の保存に失敗しました", e);
-      alert("保存に失敗しました");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const totalAll = items.reduce(
-    (sum, item) => sum + item.amountPerPayment * item.numberOfPayments,
-    0
-  );
+  }
 
   return (
-    <div className="page-container">
-      <h1>返済設定（奨学金・分割など）</h1>
-      <p style={{ marginBottom: 16 }}>
-        奨学金や分割払いについて、
-        「いつから」「どれくらいの頻度で」「何回払うか」を登録します。
-        総額は 1回あたり返済額 × 回数 から自動計算されます。
+    <div className="page-container pb-24">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-[#3b2a1a]">返済設定 (ローン管理)</h1>
+        <Link href="/debt/new" className="btn-secondary text-sm flex items-center px-3 py-2 gap-1 rounded-full">
+          <Plus className="w-4 h-4" />
+          新規追加
+        </Link>
+      </div>
+
+      <p className="text-sm text-gray-600 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+        登録済みのローンや分割払いの条件を変更できます。<br />
+        <span className="text-xs text-gray-500 mt-1 block">
+          ※ 変更は次回の返済予定から適用されます。過去の履歴は維持されます。
+        </span>
       </p>
 
-      <div className="app-card">
-        {items.length === 0 && (
-          <p style={{ fontSize: 14, marginBottom: 16 }}>
-            まだ返済設定が登録されていません。「行を追加」から入力してください。
-          </p>
-        )}
-
-        {/* テーブル形式に変更してスクロール対応 */}
-        {/* テーブル形式に変更してスクロール対応 */}
-        <>
-          {/* Desktop Table View */}
-          <div className="table-wrapper desktop-table-view">
-            <table className="table-basic" style={{ minWidth: "900px" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>名称</th>
-                  <th style={{ textAlign: "right", width: "120px" }}>1回あたり</th>
-                  <th style={{ textAlign: "center", width: "140px" }}>開始日</th>
-                  <th style={{ textAlign: "right", width: "80px" }}>支払日</th>
-                  <th style={{ textAlign: "center", width: "100px" }}>頻度</th>
-                  <th style={{ textAlign: "right", width: "80px" }}>回数</th>
-                  <th style={{ textAlign: "right", width: "120px" }}>総額(自動)</th>
-                  <th style={{ textAlign: "center", width: "80px" }}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const total = item.amountPerPayment * item.numberOfPayments;
-                  return (
-                    <tr key={item.id}>
-                      <td>
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) => handleChange(item.id, "name", e.target.value)}
-                          className="form-input"
-                          placeholder="奨学金Aなど"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={item.amountPerPayment || ""}
-                          onChange={(e) => handleChange(item.id, "amountPerPayment", e.target.value)}
-                          className="form-input"
-                          style={{ textAlign: "right" }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          value={item.startDate}
-                          onChange={(e) => handleChange(item.id, "startDate", e.target.value)}
-                          className="form-input"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min={1} max={31}
-                          value={item.paymentDay || ""}
-                          onChange={(e) => handleChange(item.id, "paymentDay", e.target.value)}
-                          className="form-input"
-                          style={{ textAlign: "right" }}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          value={item.frequency}
-                          onChange={(e) => handleChange(item.id, "frequency", e.target.value)}
-                          className="form-select"
-                        >
-                          <option value="monthly">毎月</option>
-                          <option value="half-year">半年ごと</option>
-                          <option value="yearly">年1回</option>
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min={1} max={999}
-                          value={item.numberOfPayments || ""}
-                          onChange={(e) => handleChange(item.id, "numberOfPayments", e.target.value)}
-                          className="form-input"
-                          style={{ textAlign: "right" }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "right", fontSize: 13 }}>
-                        ¥{total.toLocaleString()}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item.id)}
-                          className="btn-secondary"
-                          style={{
-                            padding: "4px 10px",
-                            fontSize: "12px",
-                            minHeight: "auto",
-                            backgroundColor: "#fff5f3",
-                            color: "#c44536",
-                            borderColor: "#c44536",
-                          }}
-                        >
-                          削除
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="space-y-4">
+        {loans.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+            <p className="text-gray-500 mb-4">登録されたローンはありません</p>
+            <Link href="/debt/new" className="text-[#b58b5a] font-bold underline">
+              ローンを登録する
+            </Link>
           </div>
-
-          {/* Mobile Card View */}
-          <div className="mobile-card-view">
-            {items.map((item) => {
-              const total = item.amountPerPayment * item.numberOfPayments;
-              return (
-                <div key={item.id} className="list-card-item">
-                  <div className="list-card-row">
-                    <span className="list-card-label" style={{ width: "60px" }}>名称</span>
-                    <input
-                      type="text"
-                      value={item.name}
-                      onChange={(e) => handleChange(item.id, "name", e.target.value)}
-                      className="form-input"
-                      placeholder="奨学金Aなど"
-                      style={{ flex: 1, padding: "8px" }}
-                    />
-                  </div>
-
-                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>1回あたり(円)</span>
-                      <input
-                        type="number"
-                        value={item.amountPerPayment || ""}
-                        onChange={(e) => handleChange(item.id, "amountPerPayment", e.target.value)}
-                        className="form-input"
-                        style={{ textAlign: "right", padding: "8px" }}
-                      />
-                    </div>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>頻度</span>
-                      <select
-                        value={item.frequency}
-                        onChange={(e) => handleChange(item.id, "frequency", e.target.value)}
-                        className="form-select"
-                        style={{ padding: "8px" }}
-                      >
-                        <option value="monthly">毎月</option>
-                        <option value="half-year">6ヶ月ごと</option>
-                        <option value="yearly">年1回</option>
-                      </select>
+        ) : (
+          loans.map((loan) => (
+            <div key={loan.id} className="bg-white rounded-2xl shadow-sm border border-[#f0ebde] overflow-hidden">
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg text-[#3b2a1a] mb-1">{loan.name}</h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                        {loan.repayment_rule === 'monthly' ? '毎月払い' : loan.repayment_rule === 'semiannual' ? 'ボーナス併用' : 'カスタム'}
+                      </span>
+                      {loan.interest_rate > 0 && <span>年利 {loan.interest_rate}%</span>}
                     </div>
                   </div>
-
-                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>開始日</span>
-                      <input
-                        type="date"
-                        value={item.startDate}
-                        onChange={(e) => handleChange(item.id, "startDate", e.target.value)}
-                        className="form-input"
-                        style={{ padding: "8px" }}
-                      />
-                    </div>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>支払日(1-31)</span>
-                      <input
-                        type="number"
-                        min={1} max={31}
-                        value={item.paymentDay || ""}
-                        onChange={(e) => handleChange(item.id, "paymentDay", e.target.value)}
-                        className="form-input"
-                        style={{ textAlign: "right", padding: "8px" }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid-container" style={{ gap: "12px", marginTop: "12px" }}>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>回数</span>
-                      <input
-                        type="number"
-                        min={1} max={999}
-                        value={item.numberOfPayments || ""}
-                        onChange={(e) => handleChange(item.id, "numberOfPayments", e.target.value)}
-                        className="form-input"
-                        style={{ textAlign: "right", padding: "8px" }}
-                      />
-                    </div>
-                    <div>
-                      <span className="list-card-label" style={{ display: "block", marginBottom: "4px" }}>総額(自動)</span>
-                      <div style={{ padding: "8px", textAlign: "right", fontWeight: "bold" }}>
-                        ¥{total.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 16, textAlign: "right", paddingTop: 12, borderTop: "1px dashed #eee" }}>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="btn-secondary"
-                      style={{
-                        padding: "6px 16px",
-                        backgroundColor: "#fff5f3",
-                        color: "#c44536",
-                        borderColor: "#c44536",
-                      }}
-                    >
-                      削除
-                    </button>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 mb-0.5">現在残高</p>
+                    {/* Accessing remaining_amount from LoanWithStatus type */}
+                    <p className="text-lg font-bold text-[#3b2a1a] font-mono">
+                      {formatCurrency((loan as any).remaining_amount || 0)}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </>
 
-        {/* 合計表示・ボタン */}
-        <div style={{ marginTop: 24 }}>
-          <div style={{ marginBottom: 16, fontSize: 14 }}>
-            登録されている返済の総額合計：
-            <strong>¥{totalAll.toLocaleString()}</strong>
-          </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-[#fffaf5] p-3 rounded-xl border border-[#f5efe6]">
+                    <p className="text-xs text-[#8c7b6c] mb-1 flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" /> 月々の返済
+                    </p>
+                    <p className="font-bold text-[#5d4330]">
+                      {formatCurrency(loan.monthly_amount || 0)}
+                    </p>
+                  </div>
+                  <div className="bg-[#fffaf5] p-3 rounded-xl border border-[#f5efe6]">
+                    <p className="text-xs text-[#8c7b6c] mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> 次回支払日 (予定)
+                    </p>
+                    <p className="font-bold text-[#5d4330]">
+                      {loan.payment_day ? `毎月 ${loan.payment_day}日` : '未設定'}
+                    </p>
+                  </div>
+                </div>
 
-          <div style={{ display: "flex", gap: 16 }}>
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="btn-secondary"
-            >
-              ＋ 行を追加
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="btn-primary"
-              style={{ minWidth: "120px" }}
-            >
-              {isSaving ? "保存中..." : "保存する"}
-            </button>
-          </div>
-        </div>
+                <div className="pt-3 border-t border-gray-100 flex justify-end">
+                  <button
+                    onClick={() => handleEdit(loan)}
+                    className="flex items-center gap-1.5 text-sm font-bold text-[#b58b5a] hover:bg-[#fffaf5] px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    条件を変更
+                  </button>
+                </div>
+              </div>
+              {/* Progress Bar (Visual flair) */}
+              <div className="h-1 bg-[#f0ebde] w-full">
+                <div
+                  className="h-full bg-[#b58b5a]"
+                  style={{ width: `${loan.principal > 0 ? ((loan as any).paid_amount / loan.principal) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 14 }}>
-        <Link href="/settings">← 設定トップへ戻る</Link>
+      <div className="mt-8 text-center">
+        <Link href="/settings" className="text-gray-400 text-sm hover:text-gray-600 underline">
+          設定トップへ戻る
+        </Link>
       </div>
+
+      <EditLoanModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+        loan={selectedLoan}
+      />
     </div>
   );
 }
