@@ -67,9 +67,9 @@ export function calculateMonthlyAnalysis(
   return {
     period: `${year}-${String(month).padStart(2, '0')}`,
     income: 0,
-    expense: totalExpense,
-    balance: -totalExpense,
+    expense: total,
+    balance: -total,
     categories: resultCategories,
-    total: totalExpense,
+    total: total,
   };
 }
