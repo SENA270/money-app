@@ -44,6 +44,10 @@ function monthLabel(year: number, month: number): string {
   return `${year}年${month}月`;
 }
 
+import InsightCard from "../components/Analysis/InsightCard";
+
+// ... existing imports ...
+
 export default function AnalysisPage() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -61,19 +65,22 @@ export default function AnalysisPage() {
   // Breakdown
   const [repaymentBreakdown, setRepaymentBreakdown] = useState<{ name: string, amount: number }[]>([]);
 
+  // NEW: Data for InsightCard
+  const [currentTransactions, setCurrentTransactions] = useState<Transaction[]>([]);
+  const [categoryTotals, setCategoryTotals] = useState<{ [key: string]: number }>({});
+  const [lastMonthCategoryTotals, setLastMonthCategoryTotals] = useState<{ [key: string]: number }>({});
+
   // Chart Data
   const [dailyData, setDailyData] = useState<number[]>([]);
   const [dailyLabels, setDailyLabels] = useState<string[]>([]);
-
   const [categoryLabels, setCategoryLabels] = useState<string[]>([]);
   const [categoryData, setCategoryData] = useState<number[]>([]);
-
   const [paymentLabels, setPaymentLabels] = useState<string[]>([]);
   const [paymentData, setPaymentData] = useState<number[]>([]);
 
   const label = monthLabel(viewYear, viewMonth);
 
-  // Month Navigation
+  // Month Navigation (same)
   const handlePrevMonth = () => {
     setViewMonth((prev) => {
       if (prev === 1) {
@@ -102,12 +109,10 @@ export default function AnalysisPage() {
         if (!user) return;
 
         // Calculate Date Ranges
-        // Current Month
         const currentStart = `${viewYear}-${String(viewMonth).padStart(2, '0')}-01`;
-        const currentEndObj = new Date(viewYear, viewMonth, 0); // Last day of viewMonth
+        const currentEndObj = new Date(viewYear, viewMonth, 0);
         const currentEnd = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${currentEndObj.getDate()}`;
 
-        // Previous Month
         let lastYear = viewYear;
         let lastMonth = viewMonth - 1;
         if (lastMonth === 0) {
@@ -117,7 +122,6 @@ export default function AnalysisPage() {
         const lastStart = `${lastYear}-${String(lastMonth).padStart(2, '0')}-01`;
 
         // Fetch BOTH months
-        // range: lastStart to currentEnd
         const { data, error } = await supabase
           .from("transactions")
           .select("*, payment_methods(name, type)")
@@ -135,10 +139,13 @@ export default function AnalysisPage() {
         let curRepayment = 0;
         let prevExpense = 0;
 
-        const dailyMap = new Array(32).fill(0); // Index 1-31
+        const dailyMap = new Array(32).fill(0);
         const catMap: { [key: string]: number } = {};
+        const lastCatMap: { [key: string]: number } = {}; // NEW
         const payMap: { [key: string]: number } = {};
         const repayMap: { [key: string]: number } = {};
+
+        const curTxs: Transaction[] = []; // NEW
 
         txs.forEach((t) => {
           const d = new Date(t.date);
@@ -152,16 +159,19 @@ export default function AnalysisPage() {
           if (isLast) {
             if (t.type === "expense") {
               prevExpense += amt;
+              // Aggregate Last Month Categories (for driver calculation)
+              const cat = t.category || "未分類";
+              lastCatMap[cat] = (lastCatMap[cat] || 0) + amt;
             }
           }
 
           if (isCurrent) {
+            curTxs.push(t); // Store for InsightCard
+
             if (t.type === "income") {
               curIncome += amt;
             } else if (t.type === "repayment") {
               curRepayment += amt;
-              // Repayment Breakdown
-              // Use Memo or Category or generic name
               const name = t.memo || t.category || "返済";
               repayMap[name] = (repayMap[name] || 0) + amt;
 
@@ -178,9 +188,13 @@ export default function AnalysisPage() {
 
               // 3. Payment Method
               let pType = "現金・その他";
+              // @ts-ignore
               if (t.payment_methods?.type === "card") pType = "カード";
+              // @ts-ignore
               else if (t.payment_methods?.type === "bank") pType = "銀行";
+              // @ts-ignore
               else if (t.payment_methods?.type === "cash") pType = "現金";
+              // @ts-ignore
               else if (t.payment_methods?.type === "wallet") pType = "電子マネー";
 
               payMap[pType] = (payMap[pType] || 0) + amt;
@@ -192,6 +206,11 @@ export default function AnalysisPage() {
         setExpenseTotal(curExpense);
         setRepaymentTotal(curRepayment);
         setLastMonthExpense(prevExpense);
+
+        // NEW: Set Data for InsightCard
+        setCurrentTransactions(curTxs);
+        setCategoryTotals(catMap);
+        setLastMonthCategoryTotals(lastCatMap);
 
         // Repayment List
         setRepaymentBreakdown(Object.entries(repayMap).map(([name, amount]) => ({ name, amount })));
@@ -233,7 +252,7 @@ export default function AnalysisPage() {
   const expenseDiff = expenseTotal - lastMonthExpense;
   const expenseDiffPercent = lastMonthExpense > 0 ? Math.round((expenseDiff / lastMonthExpense) * 100) : 0;
 
-  // Chart Options
+  // Chart Options (unchanged)
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -278,6 +297,17 @@ export default function AnalysisPage() {
         <span style={{ fontSize: 16, fontWeight: "bold", color: "#333" }}>{label}</span>
         <button className="btn-icon" onClick={handleNextMonth}>→</button>
       </div>
+
+      {/* NEW: Insight Card (Above Fold) */}
+      {!loading && (
+        <InsightCard
+          currentExpense={expenseTotal}
+          lastMonthExpense={lastMonthExpense}
+          transactions={currentTransactions}
+          categoryTotals={categoryTotals}
+          lastMonthCategoryTotals={lastMonthCategoryTotals}
+        />
+      )}
 
       {/* Summary Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
