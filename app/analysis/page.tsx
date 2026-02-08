@@ -1,4 +1,3 @@
-// app/analysis/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -265,6 +264,37 @@ export default function AnalysisPage() {
     },
   };
 
+  // ... existing options ...
+  // NEW: State for Drill-down
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // NEW: Chart Click Handler
+  const handleCategoryClick = (event: any, elements: any[]) => {
+    if (elements.length > 0) {
+      const index = elements[0].index;
+      // categoryLabels matches the chart data index
+      const category = categoryLabels[index];
+      setSelectedCategory(category);
+    }
+  };
+
+  // NEW: Filtered Transactions for Modal
+  const categoryTransactions = selectedCategory
+    ? currentTransactions
+      .filter(t => {
+        if (selectedCategory === "その他") {
+          // Logic for "Others": categories NOT in the top 5 list (excluding "Others" itself)
+          const topCats = categoryLabels.filter(c => c !== "その他");
+          return !topCats.includes(t.category || "未分類");
+        }
+        // Exact match
+        return (t.category || "未分類") === selectedCategory;
+      })
+      .filter(t => t.type === 'expense') // Safety check
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 20)
+    : [];
+
   const horizontalBarOptions = {
     indexAxis: 'y' as const,
     responsive: true,
@@ -275,7 +305,8 @@ export default function AnalysisPage() {
     scales: {
       x: { display: false },
       y: { grid: { display: false } }
-    }
+    },
+    onClick: handleCategoryClick, // Enable Click
   };
 
   const doughnutOptions = {
@@ -358,6 +389,7 @@ export default function AnalysisPage() {
       {/* 2. Category Ranking */}
       <div className="app-card" style={{ marginBottom: 20, padding: "16px" }}>
         <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16, color: "#333" }}>カテゴリ別トップ5</h3>
+        <div style={{ fontSize: 11, color: "#999", marginBottom: 8, textAlign: "right" }}>※グラフをタップして詳細を表示</div>
         <div style={{ height: 200 }}>
           {categoryData.length > 0 ? (
             <Bar
@@ -422,6 +454,53 @@ export default function AnalysisPage() {
           )}
         </div>
       </div>
+
+      {/* NEW: Category Detail Sheet Modal */}
+      {selectedCategory && (
+        <div className="modal-overlay" onClick={() => setSelectedCategory(null)} style={{ display: "flex" }}>
+          <div className="bottom-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: "80vh" }}>
+            <div className="sheet-handle" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#333" }}>{selectedCategory} の詳細</h3>
+              <button onClick={() => setSelectedCategory(null)} style={{ border: "none", background: "none", fontSize: "14px", color: "#666" }}>閉じる</button>
+            </div>
+
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {categoryTransactions.length > 0 ? (
+                <table className="table-basic">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "8px" }}>内容</th>
+                      <th style={{ textAlign: "right", padding: "8px" }}>金額</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryTransactions.map(t => (
+                      <tr key={t.id}>
+                        <td style={{ padding: "8px", fontSize: "13px" }}>
+                          <div style={{ fontWeight: "500", color: "#333", whiteSpace: "normal" }}>{t.memo || t.category}</div>
+                          <div style={{ fontSize: "10px", color: "#999" }}>
+                            {new Date(t.date).toLocaleDateString()} {/* @ts-ignore */} {t.payment_methods?.name || "現金"}
+                          </div>
+                        </td>
+                        <td style={{ padding: "8px", textAlign: "right", fontWeight: "bold", fontSize: "13px", verticalAlign: "top" }}>
+                          ¥{t.amount.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>取引がありません</div>
+              )}
+            </div>
+            {/* Disclaimer */}
+            <div style={{ fontSize: "10px", color: "#ccc", textAlign: "center", marginTop: "8px" }}>
+              上位20件を表示（金額順）
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
