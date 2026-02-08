@@ -11,7 +11,6 @@ export async function getRecentTransactions(limit: number = 10): Promise<Transac
     .select("*")
     .eq("user_id", user.id)
     .order("date", { ascending: false })
-    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) throw error;

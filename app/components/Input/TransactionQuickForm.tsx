@@ -76,19 +76,32 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
   useEffect(() => {
     async function loadQuickActions() {
       try {
-        const [tpls, hists] = await Promise.all([
+        const results = await Promise.allSettled([
           getTemplates(5),
-          getRecentTransactions(10) // fetch more to filter
+          getRecentTransactions(10)
         ]);
-        setQuickTemplates(tpls || []);
 
-        // Filter history: exclude repayments, dedup? For now just take top 5 valid expenses/incomes
-        const validHistory = (hists || [])
-          .filter(h => h.type !== 'repayment')
-          .slice(0, 5);
-        setQuickHistory(validHistory);
+        // Handle Templates
+        if (results[0].status === 'fulfilled') {
+          setQuickTemplates(results[0].value || []);
+        } else {
+          console.error("Failed to load templates", results[0].reason);
+        }
+
+        // Handle History
+        if (results[1].status === 'fulfilled') {
+          const hists = results[1].value || [];
+          // Filter history: exclude repayments, dedup? For now just take top 5 valid expenses/incomes
+          const validHistory = hists
+            .filter(h => h.type !== 'repayment')
+            .slice(0, 5);
+          setQuickHistory(validHistory);
+        } else {
+          console.error("Failed to load history", results[1].reason);
+        }
+
       } catch (e) {
-        console.error("Failed to load quick actions", e);
+        console.error("Failed to load quick actions (unexpected)", e);
       } finally {
         setRecentLoading(false);
       }
