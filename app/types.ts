@@ -217,10 +217,12 @@ export type TimelineEvent = {
   status?: 'forecast' | 'confirmed';
   cardPaymentMethodId?: string; // Added
   transactionId?: string; // Added
+  relatedTransactions?: Transaction[]; // Added
 };
 
 // Analysis Result
 export type AnalysisResult = {
+  period?: string; // Added
   income: number;
   expense: number;
   balance: number;

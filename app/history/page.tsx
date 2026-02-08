@@ -258,10 +258,10 @@ export default function HistoryPage() {
                 id: editingTransaction.id,
                 amount: String(editingTransaction.amount),
                 date: editingTransaction.date,
-                categoryId: editingTransaction.category_id,
-                paymentMethodId: editingTransaction.payment_method_id,
-                type: editingTransaction.type,
-                memo: editingTransaction.memo
+                categoryId: editingTransaction.category_id || undefined,
+                paymentMethodId: editingTransaction.payment_method_id || undefined,
+                type: editingTransaction.type as any, // Cast to handle repayment/string mismatches
+                memo: editingTransaction.memo || undefined
               }}
             />
           </div>
