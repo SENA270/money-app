@@ -323,12 +323,52 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
   return (
     <div className="app-card" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-      {/* DEBUG UI - REMOVE AFTER FIX */}
-      <div style={{ fontSize: "10px", color: "red", background: "#fee", padding: "4px" }}>
-        Debug: Loading={String(recentLoading)}, Tpl={quickTemplates.length}, Hist={quickHistory.length}
-      </div>
-
       {/* C-2: Quick Actions (Templates & History) */}
+      {!recentLoading && (quickTemplates.length > 0 || quickHistory.length > 0) && (
+        <div style={{
+          display: "flex", overflowX: "auto", gap: "8px", paddingBottom: "8px",
+          marginBottom: "-8px", scrollbarWidth: "none", msOverflowStyle: "none"
+        }}>
+          {/* Templates */}
+          {quickTemplates.map(t => (
+            <button
+              key={`tpl-${t.id}`}
+              onClick={() => handleApplyQuickAction(t, true)}
+              style={{
+                background: "#fff8e1", border: "1px solid #ffe082", borderRadius: "16px", padding: "4px 10px",
+                display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", whiteSpace: "nowrap",
+                color: "#f57f17", flexShrink: 0
+              }}
+            >
+              <Star size={10} fill="#f57f17" />
+              <span>{t.name}</span>
+              <span style={{ opacity: 0.8 }}>¥{t.amount}</span>
+            </button>
+          ))}
+
+          {/* Divider if both exist */}
+          {quickTemplates.length > 0 && quickHistory.length > 0 && (
+            <div style={{ width: 1, background: "#eee", flexShrink: 0, margin: "0 4px" }} />
+          )}
+
+          {/* History */}
+          {quickHistory.map(h => (
+            <button
+              key={`hist-${h.id}`}
+              onClick={() => handleApplyQuickAction(h, false)}
+              style={{
+                background: "#f5f5f5", border: "1px solid #ddd", borderRadius: "16px", padding: "4px 10px",
+                display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", whiteSpace: "nowrap",
+                color: "#555", flexShrink: 0
+              }}
+            >
+              <Clock size={10} />
+              <span>{getCatName(h.category_id || "")}</span>
+              <span style={{ opacity: 0.8 }}>¥{h.amount}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <div style={{ display: "flex", background: "#f0f0f0", borderRadius: "8px", padding: "2px", width: "120px" }}>
           <button
