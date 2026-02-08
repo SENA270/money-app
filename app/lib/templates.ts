@@ -1,6 +1,6 @@
 
 import { supabase } from "../../lib/supabaseClient";
-import { Database } from "@/app/types/supabase"; // Assuming types exist or will be inferred
+import { Database } from "../../types"; // Assuming types exist or will be inferred
 
 export type Template = {
   id: string;

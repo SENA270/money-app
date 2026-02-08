@@ -140,11 +140,84 @@ export interface Database {
           last_used_at?: string | null
         }
       }
+      loans: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          amount: number
+          monthly_payment: number
+          interest_rate: number
+          start_date: string
+          status: 'active' | 'completed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          name: string
+          amount: number
+          monthly_payment: number
+          interest_rate: number
+          start_date: string
+          status: 'active' | 'completed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          amount?: number
+          monthly_payment?: number
+          interest_rate?: number
+          start_date?: string
+          status?: 'active' | 'completed'
+          created_at?: string
+        }
+      }
     }
   }
 }
 
-export type Transaction = Database['public']['Tables']['transactions']['Row']
-export type Category = Database['public']['Tables']['categories']['Row']
-export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row']
-export type TransactionTemplate = Database['public']['Tables']['transaction_templates']['Row']
+export type PaymentMethodType = 'cash' | 'card' | 'bank';
+
+export type Transaction = Database['public']['Tables']['transactions']['Row'] & {
+  type: 'income' | 'expense' | 'repayment'; // Extended to suppress TS error
+  loan_id?: string | null; // Often used in UI
+};
+
+export type Category = Database['public']['Tables']['categories']['Row'];
+export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row'];
+export type TransactionTemplate = Database['public']['Tables']['transaction_templates']['Row'];
+
+// Loan Type
+export type Loan = {
+  id: string;
+  user_id: string;
+  name: string;
+  amount: number;
+  remaining_balance: number; // Computed often
+  monthly_payment: number;
+  interest_rate: number;
+  start_date: string;
+  status: 'active' | 'completed';
+  created_at: string;
+};
+
+// Timeline Event
+export type TimelineEvent = {
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense' | 'balance';
+  balance?: number;
+};
+
+// Analysis Result
+export type AnalysisResult = {
+  income: number;
+  expense: number;
+  balance: number;
+  categories: { name: string; amount: number; percentage: number; color?: string }[];
+  daily?: { date: string; income: number; expense: number }[];
+};
