@@ -108,7 +108,7 @@ export default function AnalysisPage() {
         if (!user) return;
 
         // Calculate Date Ranges
-        const currentStart = `${viewYear}-${String(viewMonth).padStart(2, '0')}-01`;
+        // const currentStart = `${viewYear}-${String(viewMonth).padStart(2, '0')}-01`;
         const currentEndObj = new Date(viewYear, viewMonth, 0);
         const currentEnd = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${currentEndObj.getDate()}`;
 
@@ -187,13 +187,13 @@ export default function AnalysisPage() {
 
               // 3. Payment Method
               let pType = "現金・その他";
-              // @ts-ignore
+              // @ts-expect-error type safety
               if (t.payment_methods?.type === "card") pType = "カード";
-              // @ts-ignore
+              // @ts-expect-error type safety
               else if (t.payment_methods?.type === "bank") pType = "銀行";
-              // @ts-ignore
+              // @ts-expect-error type safety
               else if (t.payment_methods?.type === "cash") pType = "現金";
-              // @ts-ignore
+              // @ts-expect-error type safety
               else if (t.payment_methods?.type === "wallet") pType = "電子マネー";
 
               payMap[pType] = (payMap[pType] || 0) + amt;
@@ -269,7 +269,7 @@ export default function AnalysisPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // NEW: Chart Click Handler
-  const handleCategoryClick = (event: any, elements: any[]) => {
+  const handleCategoryClick = (event: unknown, elements: { index: number }[]) => {
     if (elements.length > 0) {
       const index = elements[0].index;
       // categoryLabels matches the chart data index
@@ -480,7 +480,7 @@ export default function AnalysisPage() {
                         <td style={{ padding: "8px", fontSize: "13px" }}>
                           <div style={{ fontWeight: "500", color: "#333", whiteSpace: "normal" }}>{t.memo || t.category}</div>
                           <div style={{ fontSize: "10px", color: "#999" }}>
-                            {new Date(t.date).toLocaleDateString()} {/* @ts-ignore */} {t.payment_methods?.name || "現金"}
+                            {new Date(t.date).toLocaleDateString()} {/* @ts-expect-error type safety */} {t.payment_methods?.name || "現金"}
                           </div>
                         </td>
                         <td style={{ padding: "8px", textAlign: "right", fontWeight: "bold", fontSize: "13px", verticalAlign: "top" }}>
