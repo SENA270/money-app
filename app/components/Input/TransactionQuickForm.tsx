@@ -326,8 +326,6 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
       {/* DEBUG UI - REMOVE AFTER FIX */}
       <div style={{ fontSize: "10px", color: "red", background: "#fee", padding: "4px" }}>
         Debug: Loading={String(recentLoading)}, Tpl={quickTemplates.length}, Hist={quickHistory.length}
-        <br />
-        User: {supabase.auth.getUser().then(r => r.data.user?.id || 'none')}
       </div>
 
       {/* C-2: Quick Actions (Templates & History) */}
