@@ -268,7 +268,7 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
         // We might need a ref to focus.
         // For now relying on user tapping again or if onSuccess closes modal (but here it seems it's inline?)
         // If it is inline, we should focus.
-        document.querySelector('input[type="number"]')?.focus(); // Simple hack
+        (document.querySelector('input[type="number"]') as HTMLElement)?.focus(); // Simple hack
       }
 
     } catch (e: any) {

@@ -49,7 +49,7 @@ export default function InputSettingsPage() {
         {/* Retain Values Toggle */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: "bold", color:= "#333" }}>前回値を保持する</div>
+            <div style={{ fontSize: 15, fontWeight: "bold", color: "#333" }}>前回値を保持する</div>
             <div style={{ fontSize: 12, color: "#888" }}>カテゴリと支払い方法を記憶します</div>
           </div>
           <label className="switch">
