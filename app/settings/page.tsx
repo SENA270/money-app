@@ -91,32 +91,50 @@ export default function SettingsTopPage() {
               <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>テンプレート管理</div>
               <ChevronRight size={18} color="#ccc" />
             </div>
-          </Link>
-
-          <Link href="/settings/categories" style={{ textDecoration: "none", display: "block" }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "16px", borderBottom: "1px solid #eee8dc"
-            }}>
-              <Tag size={18} color="#5d4330" />
-              <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>カテゴリ設定</div>
-              <ChevronRight size={18} color="#ccc" />
-            </div>
-          </Link>
-
-          <Link href="/settings/saving" style={{ textDecoration: "none", display: "block" }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "16px"
-            }}>
-              <PiggyBank size={18} color="#5d4330" />
-              <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>貯金目標</div>
-              <ChevronRight size={18} color="#ccc" />
-            </div>
-          </Link>
-
         </div>
-      </div>
+      </Link>
+
+      <Link href="/settings/input" style={{ textDecoration: "none", display: "block" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "16px", borderBottom: "1px solid #eee8dc"
+        }}>
+          <div style={{
+            width: 18, height: 18,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}>
+            {/* Keyboard Icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5d4330" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6" y2="8"></line><line x1="10" y1="8" x2="10" y2="8"></line><line x1="14" y1="8" x2="14" y2="8"></line><line x1="18" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="10" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="14" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="18" y2="16"></line></svg>
+          </div>
+          <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>入力設定</div>
+          <ChevronRight size={18} color="#ccc" />
+        </div>
+      </Link>
+
+      <Link href="/settings/categories" style={{ textDecoration: "none", display: "block" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "16px", borderBottom: "1px solid #eee8dc"
+        }}>
+          <Tag size={18} color="#5d4330" />
+          <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>カテゴリ設定</div>
+          <ChevronRight size={18} color="#ccc" />
+        </div>
+      </Link>
+
+      <Link href="/settings/saving" style={{ textDecoration: "none", display: "block" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "16px"
+        }}>
+          <PiggyBank size={18} color="#5d4330" />
+          <div style={{ flex: 1, color: "#3b2a1a", fontSize: 15 }}>貯金目標</div>
+          <ChevronRight size={18} color="#ccc" />
+        </div>
+      </Link>
+
     </div>
+      </div >
+    </div >
   );
 }

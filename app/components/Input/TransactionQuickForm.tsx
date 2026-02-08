@@ -63,26 +63,47 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
 
   // Initialize Defaults
   useEffect(() => {
-    // Set default category if none selected (Only for Expense/Income)
+    const shouldRetain = localStorage.getItem("money-app-config-retain-values") !== 'false';
+
+    // 1. Load Category
     if (!isRepaymentMode && !categoryId && visibleCategories.length > 0 && type === 'expense') {
       if (initialValues?.categoryId) {
         setCategoryId(initialValues.categoryId);
+      } else if (shouldRetain) {
+        // Try localStorage first
+        const lastCatId = localStorage.getItem("money-app-last-category-id");
+        if (lastCatId && visibleCategories.find(c => c.id === lastCatId)) {
+          setCategoryId(lastCatId);
+        } else {
+          setCategoryId(visibleCategories[0].id);
+        }
       } else {
         setCategoryId(visibleCategories[0].id);
       }
     }
 
+    // 2. Load Payment Method
     if (!paymentMethodId && paymentMethods.length > 0) {
       if (initialValues?.paymentMethodId) {
         setPaymentMethodId(initialValues.paymentMethodId);
-      } else {
-        const lastUsedId = localStorage.getItem("lastUsedPaymentMethodId");
-        if (lastUsedId && paymentMethods.find(p => p.id === lastUsedId)) {
-          setPaymentMethodId(lastUsedId);
+      } else if (shouldRetain) {
+        // Try localStorage first
+        const lastPayId = localStorage.getItem("money-app-last-payment-method-id");
+        if (lastPayId && paymentMethods.find(p => p.id === lastPayId)) {
+          setPaymentMethodId(lastPayId);
         } else {
-          const pref = paymentMethods.find(p => p.type === 'cash') || paymentMethods[0];
-          setPaymentMethodId(pref.id);
+          // Fallback to legacy key or default
+          const legacyId = localStorage.getItem("lastUsedPaymentMethodId"); // Backward compatibility
+          if (legacyId && paymentMethods.find(p => p.id === legacyId)) {
+            setPaymentMethodId(legacyId);
+          } else {
+            const pref = paymentMethods.find(p => p.type === 'cash') || paymentMethods[0];
+            setPaymentMethodId(pref.id);
+          }
         }
+      } else {
+        const pref = paymentMethods.find(p => p.type === 'cash') || paymentMethods[0];
+        setPaymentMethodId(pref.id);
       }
     }
   }, [categories, paymentMethods, initialValues, categoryId, paymentMethodId, visibleCategories, type, isRepaymentMode]);
@@ -164,11 +185,33 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
         memo: memo || (finalType === 'repayment' ? "返済" : ""),
       });
 
-      localStorage.setItem("lastUsedPaymentMethodId", paymentMethodId);
+      // Save to localStorage for next time (if enabled)
+      const shouldRetain = localStorage.getItem("money-app-config-retain-values") !== 'false';
+      if (shouldRetain) {
+        localStorage.setItem("money-app-last-payment-method-id", paymentMethodId);
+        if (finalType === 'expense' && categoryId) {
+          localStorage.setItem("money-app-last-category-id", categoryId);
+        }
+      }
 
       setAmount("");
       setMemo("");
-      onSuccess();
+
+      // Post-Save Behavior
+      const behavior = localStorage.getItem("money-app-post-save-behavior");
+      if (behavior === 'history') {
+        window.location.href = '/history';
+      } else {
+        onSuccess();
+        // If continue, re-focusing is handled by rendering (autoFocus is on input)
+        // But since we don't unmount, we might need to forcefully focus? 
+        // Actually autoFocus only works on mount. 
+        // We might need a ref to focus.
+        // For now relying on user tapping again or if onSuccess closes modal (but here it seems it's inline?)
+        // If it is inline, we should focus.
+        document.querySelector('input[type="number"]')?.focus(); // Simple hack
+      }
+
     } catch (e: any) {
       alert(e.message);
     } finally {
