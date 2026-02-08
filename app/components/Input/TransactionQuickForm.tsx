@@ -3,11 +3,14 @@
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { saveTransaction } from "../../lib/transaction/saveTransaction";
+import { getTemplates, Template, updateTemplateUsage } from "../../lib/templates";
+import { getRecentTransactions } from "../../lib/transaction/getRecentTransactions";
 import { supabase } from "../../../lib/supabaseClient";
 import { useCategories } from "../../hooks/useCategories";
 import { usePaymentMethods } from "../../hooks/usePaymentMethods";
 import { getLoans, LoanWithStatus } from "../../lib/loans";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Star, Clock, ChevronRight } from "lucide-react";
+import { Transaction } from "../../types";
 
 type QuickFormProps = {
   onSuccess: () => void;
@@ -43,6 +46,11 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
   const [categoryId, setCategoryId] = useState(initialValues?.categoryId || "");
   const [paymentMethodId, setPaymentMethodId] = useState(initialValues?.paymentMethodId || "");
 
+  // Quick Actions State
+  const [quickTemplates, setQuickTemplates] = useState<Template[]>([]);
+  const [quickHistory, setQuickHistory] = useState<Transaction[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+
   // Repayment Mode State
   const [isRepaymentMode, setIsRepaymentMode] = useState(initialValues?.type === "repayment");
   const [loanId, setLoanId] = useState(initialValues?.loanId || "");
@@ -60,6 +68,57 @@ export default function TransactionQuickForm({ onSuccess, initialValues }: Quick
   const [newAccountBalance, setNewAccountBalance] = useState("");
 
   const visibleCategories = categories.filter(c => !c.is_archived);
+
+  // Helper to get names safely
+  const getCatName = (id: string) => categories.find(c => c.id === id)?.name || "Unknown";
+
+  // Fetch Quick Actions
+  useEffect(() => {
+    async function loadQuickActions() {
+      try {
+        const [tpls, hists] = await Promise.all([
+          getTemplates(5),
+          getRecentTransactions(10) // fetch more to filter
+        ]);
+        setQuickTemplates(tpls || []);
+
+        // Filter history: exclude repayments, dedup? For now just take top 5 valid expenses/incomes
+        const validHistory = (hists || [])
+          .filter(h => h.type !== 'repayment')
+          .slice(0, 5);
+        setQuickHistory(validHistory);
+      } catch (e) {
+        console.error("Failed to load quick actions", e);
+      } finally {
+        setRecentLoading(false);
+      }
+    }
+    loadQuickActions();
+  }, []); // Run once on mount
+
+  const handleApplyQuickAction = (item: Template | Transaction, isTemplate: boolean) => {
+    // 1. Set values
+    setAmount(String(item.amount));
+
+    // Type handling
+    if (item.type === 'expense' || item.type === 'income') {
+      setType(item.type);
+      setIsRepaymentMode(false);
+    } else if (item.type === 'repayment') {
+      // Should trigger repayment mode logic, but simplified for now (templates/history generally pure expense/income)
+      setIsRepaymentMode(true);
+      setType("expense"); // Repayment is under expense tab in UI
+    }
+
+    if (item.category_id) setCategoryId(item.category_id);
+    if (item.payment_method_id) setPaymentMethodId(item.payment_method_id);
+    if (item.memo) setMemo(item.memo);
+
+    // If template, we might want to track usage? (Only on save)
+    // If template, update date? (Usually retain current date)
+    // If History Copy, retain current date (don't overwrite with past date)
+  };
+
 
   // Initialize Defaults
   useEffect(() => {
