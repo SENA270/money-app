@@ -196,7 +196,8 @@ export type Loan = {
   user_id: string;
   name: string;
   amount: number;
-  remaining_balance: number; // Computed often
+  total_amount: number; // Added alias for amount/target
+  remaining_balance: number;
   monthly_payment: number;
   interest_rate: number;
   start_date: string;
@@ -204,13 +205,16 @@ export type Loan = {
   created_at: string;
 };
 
-// Timeline Event
+// Timeline Event - Consolidated
 export type TimelineEvent = {
+  id?: string;
+  label: string;
   date: string;
-  description: string;
+  description?: string;
   amount: number;
-  type: 'income' | 'expense' | 'balance';
+  type: 'income' | 'expense' | 'balance' | 'transaction' | 'card_payment';
   balance?: number;
+  status?: 'forecast' | 'confirmed';
 };
 
 // Analysis Result
@@ -218,6 +222,14 @@ export type AnalysisResult = {
   income: number;
   expense: number;
   balance: number;
-  categories: { name: string; amount: number; percentage: number; color?: string }[];
+  total?: number; // Added
+  categories: {
+    categoryId: string;
+    categoryName: string;
+    name?: string; // kept for compatibility if needed
+    amount: number;
+    percentage: number;
+    color?: string;
+  }[];
   daily?: { date: string; income: number; expense: number }[];
 };
