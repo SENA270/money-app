@@ -18,15 +18,20 @@ type InsightCardProps = {
   transactions: Transaction[];
   categoryTotals: { [key: string]: number };
   lastMonthCategoryTotals: { [key: string]: number };
+  totalBudget?: number; // NEW
+  totalBudgetedExpense?: number; // NEW
 };
 
-export default function InsightCard({
-  currentExpense,
-  lastMonthExpense,
-  transactions,
-  categoryTotals,
-  lastMonthCategoryTotals,
-}: InsightCardProps) {
+export default function InsightCard(props: InsightCardProps) {
+  const {
+    currentExpense,
+    lastMonthExpense,
+    transactions,
+    categoryTotals,
+    lastMonthCategoryTotals,
+    totalBudget = 0,
+    totalBudgetedExpense = 0,
+  } = props;
 
   // 1. Calculate Difference
   const diff = currentExpense - lastMonthExpense;
@@ -116,6 +121,39 @@ export default function InsightCard({
           </div>
         </div>
       </div>
+
+      {/* Budget Status (NEW) */}
+      {totalBudget > 0 && (
+        <div style={{ marginBottom: "16px", padding: "12px", background: "#fcfcfc", borderRadius: "8px", border: "1px solid #eee" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+            <span style={{ fontSize: "11px", color: "#999", fontWeight: "600", textTransform: "uppercase" }}>
+              Budget (設定済みのみ)
+            </span>
+            <span style={{ fontSize: "12px", fontWeight: "bold", color: totalBudgetedExpense > totalBudget ? "#e53935" : "#43a047" }}>
+              {totalBudgetedExpense > totalBudget ? "Over" : "Safe"}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span style={{ fontSize: "14px", color: "#333" }}>
+              残り: <span style={{ fontWeight: "bold" }}>¥{(totalBudget - totalBudgetedExpense).toLocaleString()}</span>
+            </span>
+            <span style={{ fontSize: "11px", color: "#666" }}>
+              {Math.round((totalBudgetedExpense / totalBudget) * 100)}% 消化
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div style={{ width: "100%", height: "6px", background: "#eee", borderRadius: "3px", marginTop: "8px", overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              borderRadius: "3px",
+              width: `${Math.min((totalBudgetedExpense / totalBudget) * 100, 100)}%`,
+              background: totalBudgetedExpense > totalBudget ? "#e53935" : totalBudgetedExpense > totalBudget * 0.8 ? "#fdd835" : "#43a047"
+            }} />
+          </div>
+        </div>
+      )}
 
       {/* High Impact List (Top 3) */}
       <div style={{ background: "rgba(255,255,255,0.6)", borderRadius: "8px", padding: "12px" }}>

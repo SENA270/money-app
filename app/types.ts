@@ -175,6 +175,35 @@ export interface Database {
           created_at?: string
         }
       }
+      category_budgets: {
+        Row: {
+          id: string
+          user_id: string
+          category: string
+          amount: number
+          year: number
+          month: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          category: string
+          amount: number
+          year: number
+          month: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          category?: string
+          amount?: number
+          year?: number
+          month?: number
+          created_at?: string
+        }
+      }
     }
   }
 }
@@ -189,6 +218,7 @@ export type Transaction = Omit<Database['public']['Tables']['transactions']['Row
 export type Category = Database['public']['Tables']['categories']['Row'];
 export type PaymentMethod = Database['public']['Tables']['payment_methods']['Row'];
 export type TransactionTemplate = Database['public']['Tables']['transaction_templates']['Row'];
+export type CategoryBudget = Database['public']['Tables']['category_budgets']['Row'];
 
 // Loan Type
 export type Loan = {
