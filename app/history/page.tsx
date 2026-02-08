@@ -7,7 +7,8 @@ import { Transaction } from "../types";
 import { useCategories } from "../hooks/useCategories";
 import { usePaymentMethods } from "../hooks/usePaymentMethods";
 import TransactionQuickForm from "../components/Input/TransactionQuickForm";
-import { ChevronLeft, ChevronRight, Search, Edit2, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, Search, Edit2, Trash2, Copy } from "lucide-react";
 
 export default function HistoryPage() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -197,6 +198,18 @@ export default function HistoryPage() {
 
                       {/* Actions */}
                       <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                        {tx.type !== 'repayment' && (
+                          <Link
+                            href={`/input?copy=${tx.id}`}
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              color: "#d69e2e", padding: 4, display: "flex", alignItems: "center"
+                            }}
+                            aria-label="コピー"
+                          >
+                            <Copy size={16} />
+                          </Link>
+                        )}
                         <button
                           onClick={() => setEditingTransaction(tx)}
                           style={{

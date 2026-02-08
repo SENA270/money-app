@@ -24,7 +24,7 @@ export interface Transaction {
   user_id: string;
   date: string;
   amount: number;
-  type: 'income' | 'expense'; // 'card_payment' is removed from raw data
+  type: 'income' | 'expense' | 'repayment'; // 'card_payment' is removed from raw data
   memo?: string;
 
   // Foreign Keys (New)
